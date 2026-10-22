@@ -1,0 +1,4 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><div><h1>계정과목표</h1><p class="muted">등록 계정과목 {{ accounts|length }}개 · 전표 입력 시 코드로 구분하여 선택합니다.</p></div><a class="btn" href="{% url 'voucher_new' %}">전표 입력</a></div>
+<section class="panel"><div class="table-wrap"><table><thead><tr><th>코드</th><th>계정과목</th><th>소분류</th><th>중분류</th><th>대분류</th></tr></thead><tbody>{% for account in accounts %}<tr><td>{{ account.code }}</td><td>{{ account.name }}</td><td>{{ account.category }}</td><td>{{ account.section|default:'—' }}</td><td>{{ account.element|default:'—' }}</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}
