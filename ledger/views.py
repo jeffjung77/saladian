@@ -1,57 +1,190 @@
 from decimal import Decimal
+from datetime import timedelta
 from django.contrib import messages
-from django.db.models import Sum, Q
-from django.db import transaction
+from django.db.models import Sum, Q, F
+from django.db import transaction, IntegrityError
+from django.core.paginator import Paginator
+from django.http import JsonResponse, FileResponse, Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from .forms import VoucherForm, PeriodForm, PartnerLedgerForm, JournalHeaderForm, JournalRows, BalanceSheetForm, IncomeStatementForm
-from .models import Voucher, Account, JournalLine
+from .models import Voucher, Account, JournalLine, Counterparty
+from .forms import CounterpartyForm
 from . import reports
 from .forms import AccountLedgerForm
+from .permissions import management_required
+from .forms import AccountForm
+from .models import AccountPreference
+from .account_settings import visible_accounts
+
+
+def business_overview(request):
+    today = timezone.localdate()
+    start = today.replace(day=1)
+    source = Voucher.objects.filter(owner=request.user)
+    balance = reports.balance_sheet(today, vouchers=source)
+    income = reports.income_statement(start, today, vouchers=source)
+    accounts = {account.pk: account for account in Account.objects.all()}
+    cash = {'1101': Decimal(0), '1102': Decimal(0)}
+    changes = {}
+    opening = Decimal(0)
+    for voucher in source.filter(date__lte=today).select_related('account_master', 'settlement_account').prefetch_related('journal_lines__account'):
+        postings, reason = reports.voucher_postings(voucher, accounts)
+        if reason:
+            continue
+        for posting in postings:
+            if posting['account_id'] not in cash:
+                continue
+            cash[posting['account_id']] += posting['net']
+            if voucher.date < start:
+                opening += posting['net']
+            else:
+                changes[voucher.date] = changes.get(voucher.date, Decimal(0)) + posting['net']
+    points = []
+    running = opening
+    day = start
+    while day <= today:
+        running += changes.get(day, Decimal(0))
+        points.append({'label': day.strftime('%m/%d'), 'value': str(running)})
+        day += timedelta(days=1)
+    revenue = sum((section['total'] for section in income['sections'] if section['name'] in ('매출액', '영업외수익')), Decimal(0))
+    expense = revenue - income['net_profit']
+    response = render(request, 'ledger/business_overview.html', {
+        'today': today, 'start': start, 'balance': balance, 'income': income,
+        'cash_total': sum(cash.values(), Decimal(0)), 'cash_amount': cash['1101'], 'bank_amount': cash['1102'],
+        'cash_opening': opening, 'revenue': revenue, 'expense': expense,
+        'cash_points': points, 'profit_points': [
+            {'label': '수익', 'value': str(revenue)}, {'label': '비용', 'value': str(expense)},
+            {'label': '순이익', 'value': str(income['net_profit'])}],
+    })
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@require_http_methods(['GET'])
+def counterparty_options(request):
+    options = list(Counterparty.objects.filter(owner=request.user).values('id', 'name'))
+    response = JsonResponse({'counterparties': options})
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@management_required
+def counterparties(request):
+    query = request.GET.get('q', '').strip()[:100]
+    partners = Counterparty.objects.filter(owner=request.user)
+    if query:
+        partners = partners.filter(Q(name__icontains=query) | Q(business_number__icontains=query) | Q(contact_name__icontains=query) | Q(phone__icontains=query))
+    if query.upper().startswith('CP') and query[2:].isascii() and query[2:].isdigit() and len(query[2:]) <= 18:
+        partners = Counterparty.objects.filter(owner=request.user, pk=int(query[2:]))
+    page = Paginator(partners, 25).get_page(request.GET.get('page'))
+    return render(request, 'ledger/counterparties.html', {'page': page, 'q': query})
+
+
+@require_http_methods(['GET', 'POST'])
+@management_required
+def counterparty_edit(request, pk=None):
+    partner = get_object_or_404(Counterparty, pk=pk, owner=request.user) if pk else None
+    form = CounterpartyForm(request.POST if request.method == 'POST' else None, request.FILES if request.method == 'POST' else None, instance=partner, user=request.user)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            with transaction.atomic():
+                form.save()
+        except IntegrityError:
+            if not Counterparty.objects.filter(owner=request.user, name=form.cleaned_data['name']).exists():
+                raise
+            form.add_error('name', '이미 등록된 거래처명입니다.')
+        else:
+            messages.success(request, '거래처를 저장했습니다.')
+            return redirect('counterparties')
+    return render(request, 'ledger/counterparty_form.html', {'form': form, 'partner': partner})
 
 
 def account_ledger(request):
     today = timezone.localdate()
-    form = AccountLedgerForm(request.GET if request.GET else None, initial={'start': today.replace(month=1, day=1), 'end': today})
+    form = AccountLedgerForm(request.GET if request.GET else None, initial={'start': today.replace(month=1, day=1), 'end': today}, user=request.user)
     report = None
     if form.is_bound and form.is_valid():
-        report = reports.account_ledger(form.cleaned_data['account'], form.cleaned_data['start'], form.cleaned_data['end'])
+        report = reports.account_ledger(form.cleaned_data['account'], form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner=request.user))
     return render(request, 'ledger/account_ledger.html', {'form': form, 'report': report})
 
 
 def balance_sheet(request):
     today = timezone.localdate()
     form = BalanceSheetForm(request.GET if request.GET else {'as_of': today})
-    report = reports.balance_sheet(form.cleaned_data['as_of']) if form.is_valid() else None
+    report = reports.balance_sheet(form.cleaned_data['as_of'], vouchers=Voucher.objects.filter(owner=request.user)) if form.is_valid() else None
     return render(request, 'ledger/balance_sheet.html', {'form': form, 'report': report})
 
 
 def income_statement(request):
     today = timezone.localdate()
     form = IncomeStatementForm(request.GET if request.GET else {'start': today.replace(month=1, day=1), 'end': today})
-    report = reports.income_statement(form.cleaned_data['start'], form.cleaned_data['end']) if form.is_valid() else None
+    report = reports.income_statement(form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner=request.user)) if form.is_valid() else None
     return render(request, 'ledger/income_statement.html', {'form': form, 'report': report})
 
 
+@management_required
 def accounts(request):
-    return render(request, 'ledger/accounts.html', {'accounts': Account.objects.all()})
+    disabled = set(AccountPreference.objects.filter(owner=request.user, is_active=False).values_list('account_id', flat=True))
+    rows = list(visible_accounts(request.user))
+    for account in rows:
+        account.is_active = account.pk not in disabled
+    return render(request, 'ledger/accounts.html', {'accounts': rows})
+
+
+@management_required
+@require_http_methods(['POST'])
+def account_status(request, code):
+    account = get_object_or_404(visible_accounts(request.user), pk=code)
+    state = request.POST.get('is_active')
+    if state not in ('0', '1'):
+        return JsonResponse({'error': '사용 여부를 선택하세요.'}, status=400)
+    AccountPreference.objects.update_or_create(owner=request.user, account=account, defaults={'is_active': state == '1'})
+    messages.success(request, f'{account} 계정을 {"사용" if state == "1" else "비사용"}으로 설정했습니다.')
+    return redirect('accounts')
+
+
+@management_required
+@require_http_methods(['GET', 'POST'])
+def account_new(request):
+    form = AccountForm(request.POST if request.method == 'POST' else None)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            with transaction.atomic():
+                account = form.save(commit=False)
+                account.owner = request.user
+                account.save()
+        except IntegrityError:
+            if not Account.objects.filter(pk=form.cleaned_data['code']).exists():
+                raise
+            form.add_error('code', '이미 등록된 계정코드입니다.')
+        else:
+            messages.success(request, '신규 계정과목을 등록했습니다.')
+            return redirect('accounts')
+    return render(request, 'ledger/account_form.html', {'form': form})
 
 
 def partner_ledger(request):
-    form = PartnerLedgerForm(request.GET if request.GET else None)
+    form = PartnerLedgerForm(request.GET if request.GET else None, user=request.user)
     rows = []
     income = expense = opening = Decimal(0)
     partner_name = None
     journal_vouchers = Voucher.objects.none()
     if form.is_valid():
         selected = form.cleaned_data['partner']
-        partner = '' if selected == 'unassigned:' else selected[len('name:'):]
-        partner_name = partner or '거래처 미입력'
-        vouchers = Voucher.objects.select_related('account_master').filter(partner=partner)
+        vouchers = Voucher.objects.select_related('account_master', 'counterparty').filter(owner=request.user)
+        if selected.startswith('master:'):
+            partner = get_object_or_404(Counterparty, pk=selected[len('master:'):], owner=request.user)
+            partner_name = partner.name
+            vouchers = vouchers.filter(counterparty=partner)
+        else:
+            partner = '' if selected == 'unassigned:' else selected[len('name:'):]
+            partner_name = partner or '거래처 미입력'
+            vouchers = vouchers.filter(counterparty__isnull=True, partner=partner)
         start, end = form.cleaned_data.get('start'), form.cleaned_data.get('end')
         if start:
-            previous = vouchers.filter(date__lt=start).aggregate(income=Sum('amount', filter=Q(kind='income')), expense=Sum('amount', filter=Q(kind='expense')))
+            previous = vouchers.filter(date__lt=start).aggregate(income=Sum(F('amount') + F('vat_amount'), filter=Q(kind='income')), expense=Sum(F('amount') + F('vat_amount'), filter=Q(kind='expense')))
             opening = (previous['income'] or Decimal(0)) - (previous['expense'] or Decimal(0))
             vouchers = vouchers.filter(date__gte=start)
         if end:
@@ -61,11 +194,11 @@ def partner_ledger(request):
         running = opening
         for voucher in vouchers.order_by('date', 'pk'):
             if voucher.kind == Voucher.Kind.INCOME:
-                income += voucher.amount
-                running += voucher.amount
+                income += voucher.gross_amount
+                running += voucher.gross_amount
             else:
-                expense += voucher.amount
-                running -= voucher.amount
+                expense += voucher.gross_amount
+                running -= voucher.gross_amount
             rows.append({'voucher': voucher, 'balance': running})
     return render(request, 'ledger/partner_ledger.html', {
         'form': form, 'rows': rows, 'partner_name': partner_name,
@@ -78,7 +211,7 @@ def partner_ledger(request):
 
 def dashboard(request):
     period = PeriodForm(request.GET)
-    vouchers = Voucher.objects.select_related('account_master').all()
+    vouchers = Voucher.objects.select_related('account_master', 'counterparty').filter(owner=request.user)
     if period.is_valid():
         if period.cleaned_data.get('start'):
             vouchers = vouchers.filter(date__gte=period.cleaned_data['start'])
@@ -86,7 +219,7 @@ def dashboard(request):
             vouchers = vouchers.filter(date__lte=period.cleaned_data['end'])
     else:
         vouchers = vouchers.none()
-    totals = vouchers.aggregate(income=Sum('amount', filter=Q(kind='income')), expense=Sum('amount', filter=Q(kind='expense')))
+    totals = vouchers.aggregate(income=Sum(F('amount') + F('vat_amount'), filter=Q(kind='income')), expense=Sum(F('amount') + F('vat_amount'), filter=Q(kind='expense')))
     income, expense = totals['income'] or Decimal(0), totals['expense'] or Decimal(0)
     groups = vouchers.exclude(kind=Voucher.Kind.JOURNAL).order_by().values('kind', 'account', 'account_master_id').annotate(total=Sum('amount')).order_by('kind', '-total', 'account_master_id', 'account')
     journal_groups = JournalLine.objects.filter(voucher__in=vouchers).order_by().values('account_id', 'account__name').annotate(debit=Sum('amount', filter=Q(side='debit')), credit=Sum('amount', filter=Q(side='credit'))).order_by('account_id')
@@ -95,14 +228,16 @@ def dashboard(request):
 
 @require_http_methods(['GET', 'POST'])
 def edit(request, pk=None, entry_type=Voucher.EntryType.OTHER):
-    voucher = get_object_or_404(Voucher, pk=pk) if pk else None
+    voucher = get_object_or_404(Voucher, pk=pk, owner=request.user) if pk else None
     if (voucher and voucher.is_journal) or (not voucher and entry_type == Voucher.EntryType.OTHER):
         return journal_edit(request, voucher)
     if voucher:
         entry_type = voucher.entry_type
-    form = VoucherForm(request.POST if request.method == 'POST' else None, instance=voucher, entry_type=entry_type)
+    form = VoucherForm(request.POST if request.method == 'POST' else None, instance=voucher, entry_type=entry_type, user=request.user)
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        saved = form.save(commit=False)
+        saved.owner = request.user
+        saved.save()
         messages.success(request, '전표를 저장했습니다.')
         return redirect('dashboard')
     labels = dict(Voucher.EntryType.choices)
@@ -117,13 +252,24 @@ def journal_edit(request, voucher=None):
             initial[line.row - 1][f'{line.side}_amount'] = line.amount
             initial[line.row - 1]['memo'] = line.memo
     data = request.POST if request.method == 'POST' else None
-    form = JournalHeaderForm(data, instance=voucher)
-    rows = JournalRows(data, prefix='lines', initial=initial)
+    form = JournalHeaderForm(data, instance=voucher, user=request.user)
+    rows = JournalRows(data, prefix='lines', initial=initial, form_kwargs={'user': request.user})
     if request.method == 'POST':
         header_valid, rows_valid = form.is_valid(), rows.is_valid()
+        if header_valid and rows_valid and form.cleaned_data.get('vat_code'):
+            trade = form.cleaned_data['vat_trade']
+            account, side = ('2107', 'credit') if trade == 'S' else ('1209', 'debit')
+            expected = form.cleaned_data['vat_amount'] if trade == 'S' else (form.cleaned_data['vat_amount'] if form.cleaned_data['vat_deduction'] == 'C01' else form.cleaned_data['vat_deductible'] if form.cleaned_data['vat_deduction'] == 'C03' else Decimal(0))
+            actual = sum((row.cleaned_data.get(f'{side}_amount') or Decimal(0) for row in rows if getattr(row.cleaned_data.get(f'{side}_account'), 'pk', None) == account), Decimal(0))
+            opposite = 'debit' if side == 'credit' else 'credit'
+            reversed_tax = any(getattr(row.cleaned_data.get(f'{opposite}_account'), 'pk', None) == account for row in rows)
+            if actual != expected or reversed_tax:
+                form.add_error('vat_amount', f'분개에 {account} 계정을 {"대변" if side == "credit" else "차변"} {expected:,.0f}원으로 입력하세요. 부가세는 자동으로 추가되지 않습니다.')
+                header_valid = False
         if header_valid and rows_valid:
             with transaction.atomic():
                 saved = form.save(commit=False)
+                saved.owner = request.user
                 saved.entry_type = Voucher.EntryType.OTHER
                 saved.kind = Voucher.Kind.JOURNAL
                 saved.account = '복합전표'
@@ -144,9 +290,24 @@ def journal_edit(request, voucher=None):
 
 @require_http_methods(['GET', 'POST'])
 def delete(request, pk):
-    voucher = get_object_or_404(Voucher, pk=pk)
+    voucher = get_object_or_404(Voucher, pk=pk, owner=request.user)
     if request.method == 'POST':
         voucher.delete()
         messages.success(request, '전표를 삭제했습니다.')
         return redirect('dashboard')
     return render(request, 'ledger/delete.html', {'voucher': voucher})
+
+
+@require_http_methods(['GET'])
+@management_required
+def counterparty_certificate(request, pk):
+    partner = get_object_or_404(Counterparty, pk=pk, owner=request.user)
+    if not partner.business_certificate:
+        raise Http404
+    try:
+        response = FileResponse(partner.business_certificate.open('rb'), as_attachment=True, filename='business-certificate.pdf', content_type='application/pdf')
+    except FileNotFoundError:
+        raise Http404
+    response['Cache-Control'] = 'private, no-store'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response

@@ -2,13 +2,24 @@
 <div class="heading"><div><h1>기타전표{% if voucher %} · 수정{% endif %}</h1><p class="muted">차변과 대변의 계정과목·금액을 각각 입력하세요. 양쪽 합계가 일치해야 저장됩니다.</p></div></div>
 {% if not voucher %}<div class="panel">{% include 'ledger/entry_links.html' %}</div>{% endif %}
 <form method="post" id="journal-form">{% csrf_token %}
-<section class="panel"><div class="form-grid">{{ form.non_field_errors }}{% for field in form %}<div {% if field.name == 'memo' %}class="wide"{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{{ field.errors }}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}</div>{% endfor %}</div></section>
+<section class="panel"><div class="form-grid">{{ form.non_field_errors }}{% for field in form %}<div {% if field.name == 'memo' %}class="wide"{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{{ field.errors }}{% if field.name == 'counterparty' %}{% include 'ledger/counterparty_picker.html' %}{% endif %}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}</div>{% endfor %}</div></section>
 <section class="panel">{{ rows.management_form }}{{ rows.non_form_errors }}
 <h2>분개 입력 · 차변 5행 / 대변 5행</h2><p class="muted">라인 적요는 같은 행의 차변·대변에 공통으로 적용됩니다. 사용하지 않는 칸은 비워두세요. 각 방향에서 계정과 금액을 함께 입력하며, 같은 행의 차변·대변 금액이 같을 필요는 없습니다.</p>
-<div class="table-wrap"><table class="journal-input"><thead><tr><th scope="col">행</th><th scope="col">차변 계정과목</th><th scope="col">차변 금액(원)</th><th scope="col">대변 계정과목</th><th scope="col">대변 금액(원)</th><th scope="col">라인 적요</th></tr></thead><tbody>{% for row in rows %}<tr><th scope="row">{{ forloop.counter }}</th><td><label class="sr-only" for="{{ row.debit_account.id_for_label }}">{{ forloop.counter }}행 차변 계정과목</label>{{ row.debit_account }}{{ row.debit_account.errors }}</td><td><label class="sr-only" for="{{ row.debit_amount.id_for_label }}">{{ forloop.counter }}행 차변 금액</label>{{ row.debit_amount }}{{ row.debit_amount.errors }}</td><td><label class="sr-only" for="{{ row.credit_account.id_for_label }}">{{ forloop.counter }}행 대변 계정과목</label>{{ row.credit_account }}{{ row.credit_account.errors }}</td><td><label class="sr-only" for="{{ row.credit_amount.id_for_label }}">{{ forloop.counter }}행 대변 금액</label>{{ row.credit_amount }}{{ row.credit_amount.errors }}</td><td><label class="sr-only" for="{{ row.memo.id_for_label }}">{{ forloop.counter }}행 공통 적요</label>{{ row.memo }}{{ row.memo.errors }}</td></tr>{% endfor %}</tbody><tfoot><tr><th colspan="2">차변 합계</th><th class="num"><output id="debit-total">0</output>원</th><th>대변 합계</th><th class="num"><output id="credit-total">0</output>원</th><th></th></tr></tfoot></table></div>
+<div class="table-wrap journal-scroll" tabindex="0" role="region" aria-label="Journal entry horizontal scroll"><table class="journal-input"><colgroup><col style="width:32px"><col style="width:68px"><col style="width:20%"><col style="width:14%"><col style="width:68px"><col style="width:20%"><col style="width:14%"><col></colgroup><thead><tr><th scope="col">행</th><th scope="col">차변 코드</th><th scope="col">차변 계정과목</th><th scope="col">차변 금액(원)</th><th scope="col">대변 코드</th><th scope="col">대변 계정과목</th><th scope="col">대변 금액(원)</th><th scope="col">라인 적요</th></tr></thead><tbody>{% for row in rows %}<tr><th scope="row">{{ forloop.counter }}</th><td><label class="sr-only" for="{{ row.debit_code.id_for_label }}">{{ row.debit_code.label }}</label>{{ row.debit_code }}{{ row.debit_code.errors }}</td><td><label class="sr-only" for="{{ row.debit_name.id_for_label }}">{{ row.debit_name.label }}</label>{{ row.debit_name }}{{ row.debit_name.errors }}<label class="sr-only" for="{{ row.debit_account.id_for_label }}">{{ forloop.counter }}행 차변 계정과목</label>{{ row.debit_account }}{{ row.debit_account.errors }}</td><td><label class="sr-only" for="{{ row.debit_amount.id_for_label }}">{{ forloop.counter }}행 차변 금액</label>{{ row.debit_amount }}{{ row.debit_amount.errors }}</td><td><label class="sr-only" for="{{ row.credit_code.id_for_label }}">{{ row.credit_code.label }}</label>{{ row.credit_code }}{{ row.credit_code.errors }}</td><td><label class="sr-only" for="{{ row.credit_name.id_for_label }}">{{ row.credit_name.label }}</label>{{ row.credit_name }}{{ row.credit_name.errors }}<label class="sr-only" for="{{ row.credit_account.id_for_label }}">{{ forloop.counter }}행 대변 계정과목</label>{{ row.credit_account }}{{ row.credit_account.errors }}</td><td><label class="sr-only" for="{{ row.credit_amount.id_for_label }}">{{ forloop.counter }}행 대변 금액</label>{{ row.credit_amount }}{{ row.credit_amount.errors }}</td><td><label class="sr-only" for="{{ row.memo.id_for_label }}">{{ forloop.counter }}행 공통 적요</label>{{ row.memo }}{{ row.memo.errors }}</td></tr>{% endfor %}</tbody><tfoot><tr><th colspan="3">차변 합계</th><th class="num"><output id="debit-total">0</output>원</th><th colspan="2">대변 합계</th><th class="num"><output id="credit-total">0</output>원</th><th></th></tr></tfoot></table></div>
 <p id="balance-message" role="status" aria-live="polite"></p><button type="submit">전표 저장</button> <a class="btn secondary" href="{% url 'dashboard' %}">취소</a>
 </section></form>
-<style>.journal-input{min-width:1100px;table-layout:fixed}.journal-input th:first-child{width:44px}.journal-input thead th:nth-child(2),.journal-input thead th:nth-child(4){width:23%}.journal-input thead th:nth-child(3),.journal-input thead th:nth-child(5){width:13%}.journal-input thead th:nth-child(6){width:24%}.journal-input input,.journal-input select{min-width:0}.journal-input .errorlist{white-space:normal}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}</style>
+<style>
+.journal-scroll{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.journal-input{width:100%;min-width:1000px;max-width:none;table-layout:fixed;font-size:13px}
+body:has(#journal-form) main{max-width:1480px}
+.journal-input th,.journal-input td{vertical-align:top;white-space:normal;overflow-wrap:anywhere;padding:10px 6px}
+.journal-input input,.journal-input select{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:9px 6px;font-size:13px}
+.journal-input select{margin-top:6px}
+.journal-input input[name$="_code"]{text-align:center;font-variant-numeric:tabular-nums}
+.journal-input input[data-money]{text-align:right;font-variant-numeric:tabular-nums}
+.journal-input .errorlist{white-space:normal}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+</style>
 <script>
 (() => {
   const form = document.getElementById('journal-form');
@@ -18,9 +29,10 @@
     for (const side of ['debit', 'credit']) {
       totals[side] = 0n;
       form.querySelectorAll(`input[name$="-${side}_amount"]`).forEach(input => {
-        if (!input.value) return;
-        if (!/^\d+$/.test(input.value) || BigInt(input.value) <= 0n) { invalid = true; return; }
-        totals[side] += BigInt(input.value);
+        const value = input.value.replace(/,/g, '');
+        if (!value) return;
+        if (!/^\d+$/.test(value) || BigInt(value) <= 0n) { invalid = true; return; }
+        totals[side] += BigInt(value);
       });
       document.getElementById(`${side}-total`).textContent = totals[side].toLocaleString('ko-KR');
     }
@@ -33,4 +45,4 @@
   update();
 })();
 </script>
-{% endblock %}
+{% load static %}<script src="{% static 'ledger/journal_accounts.js' %}?v=1"></script>{% include 'ledger/vat_help.html' %}{% endblock %}

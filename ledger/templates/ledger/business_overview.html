@@ -1,0 +1,72 @@
+{% extends 'ledger/base.html' %}{% load humanize %}{% block content %}
+<style>
+.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.overview-grid .panel{min-width:0}.overview-chart{display:block;width:100%;height:240px}.overview-summary{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}.overview-summary strong{font-size:28px}.overview-links{display:flex;gap:10px;flex-wrap:wrap}.overview-note{font-size:13px}@media(max-width:800px){.overview-grid{grid-template-columns:1fr}}
+</style>
+<div class="heading"><div><h1>사업현황 한눈에 보기</h1><p class="muted">{{ today|date:'Y년 m월 d일' }} 기준 · 내 장부의 현금, 손익, 재무상태를 확인하세요.</p></div><a class="btn" href="{% url 'sales_new' %}">+ 매출입력</a></div>
+<div class="cards">
+<div class="card"><span class="muted">현금·예금 합계잔액</span><strong>{{ cash_total|intcomma }}원</strong></div>
+<div class="card"><span class="muted">이번 달 순이익</span><strong class="{% if income.net_profit < 0 %}expense{% else %}income{% endif %}">{{ income.net_profit|intcomma }}원</strong></div>
+<div class="card"><span class="muted">현재 자산총계</span><strong>{{ balance.assets|intcomma }}원</strong></div>
+</div>
+{% if not balance.included_count %}<div class="notice">집계할 전표가 없습니다. 전표를 입력하면 그래프와 재무상태가 표시됩니다.</div>{% endif %}
+{% if balance.excluded %}<div class="notice">분개 정보 확인이 필요한 전표 {{ balance.excluded|length }}건은 집계에서 제외했습니다. <a href="{% url 'balance_sheet' %}?as_of={{ today|date:'Y-m-d' }}">대차대조표에서 확인하기</a></div>{% endif %}
+<div class="overview-grid">
+<section class="panel"><h2>현금계정 합계잔액 그래프</h2><p class="muted">{{ start|date:'m월 d일' }} ~ {{ today|date:'m월 d일' }} · 일별 마감잔액</p>
+<canvas id="cash-chart" class="overview-chart" role="img" aria-label="이번 달 일별 현금과 예금의 합계잔액 추이. 상세 금액은 아래 표에서 확인할 수 있습니다."></canvas>
+<div class="table-wrap"><table><tbody><tr><th>월초 이월잔액</th><td class="num">{{ cash_opening|intcomma }}원</td></tr><tr><th>현금 (1101)</th><td class="num">{{ cash_amount|intcomma }}원</td></tr><tr><th>예금 (1102)</th><td class="num">{{ bank_amount|intcomma }}원</td></tr><tr><th>현재 합계잔액</th><td class="num">{{ cash_total|intcomma }}원</td></tr></tbody></table></div>
+<details><summary>일별 잔액 보기</summary><table><thead><tr><th>날짜</th><th class="num">잔액(원)</th></tr></thead><tbody>{% for point in cash_points %}<tr><td>{{ point.label }}</td><td class="num">{{ point.value|intcomma }}</td></tr>{% endfor %}</tbody></table></details>
+<p class="muted overview-note">현금(1101)과 예금(1102)을 합산합니다. 두 계정 간 이체는 합계잔액에 영향을 주지 않습니다.</p></section>
+<section class="panel"><h2>이번 달 손익 그래프</h2><p class="muted">{{ start|date:'Y.m.d' }} ~ {{ today|date:'Y.m.d' }} · 오늘까지</p>
+<canvas id="profit-chart" class="overview-chart" role="img" aria-label="이번 달 수익, 비용, 순이익 비교. 금액은 아래 표에서 확인할 수 있습니다."></canvas>
+<table><tbody><tr><th>수익 합계</th><td class="num">{{ revenue|intcomma }}원</td></tr><tr><th>비용 합계</th><td class="num">{{ expense|intcomma }}원</td></tr><tr><th>당기순이익(손실)</th><td class="num">{{ income.net_profit|intcomma }}원</td></tr></tbody></table>
+<p class="muted overview-note">수익은 매출액·영업외수익, 비용은 매출원가·판매관리비·영업외비용·법인세비용입니다. 손익대체 결산전표 {{ income.closing_count }}건은 제외합니다.</p>
+<a href="{% url 'income_statement' %}?start={{ start|date:'Y-m-d' }}&amp;end={{ today|date:'Y-m-d' }}">이번 달 손익계산서 자세히 보기 →</a></section>
+</div>
+<section class="panel"><div class="overview-summary"><h2>현재의 요약대차대조표</h2><span class="muted">{{ today|date:'Y.m.d' }} 기준</span></div>
+<div class="table-wrap"><table><thead><tr><th>구분</th><th class="num">금액(원)</th></tr></thead><tbody><tr><th>자산총계</th><td class="num">{{ balance.assets|intcomma }}</td></tr><tr><th>부채총계</th><td class="num">{{ balance.liabilities|intcomma }}</td></tr><tr><th>자본총계</th><td class="num">{{ balance.equity|intcomma }}</td></tr><tr><th>부채 및 자본총계</th><td class="num">{{ balance.liabilities_equity|intcomma }}</td></tr><tr><th>대차 차액</th><td class="num">{{ balance.difference|intcomma }} {% if not balance.difference %}(일치){% endif %}</td></tr></tbody></table></div>
+<p class="muted overview-note">자본에는 미결산 누적손익 {{ balance.unclosed_profit|intcomma }}원이 포함됩니다. 기초잔액과 필요한 조정은 기타전표로 입력하세요.</p><a href="{% url 'balance_sheet' %}?as_of={{ today|date:'Y-m-d' }}">대차대조표 자세히 보기 →</a></section>
+{{ cash_points|json_script:'cash-data' }}{{ profit_points|json_script:'profit-data' }}
+<script>
+(() => {
+ const money = v => Math.round(v).toLocaleString('ko-KR');
+ function draw(id, dataId, bars) {
+  const canvas = document.getElementById(id), data = JSON.parse(document.getElementById(dataId).textContent);
+  const width = canvas.clientWidth, height = 240, ratio = window.devicePixelRatio || 1;
+  canvas.width = width * ratio; canvas.height = height * ratio;
+  const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio); ctx.font = '12px sans-serif';
+  const values = data.map(p => Number(p.value)), low = Math.min(0, ...values), high = Math.max(0, ...values);
+  const range = high - low || 1, left = Math.min(115, width * .32), right = width - 22, top = 24, bottom = height - 35;
+  const y = value => bottom - (value - low) / range * (bottom - top);
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+   const value = low + range * i / 4, pos = y(value);
+   ctx.strokeStyle = '#e0e7e3'; ctx.beginPath(); ctx.moveTo(left, pos); ctx.lineTo(right, pos); ctx.stroke();
+   ctx.fillStyle = '#64756d'; ctx.fillText(money(value), left - 8, pos + 4);
+  }
+  ctx.strokeStyle = '#64756d'; ctx.beginPath(); ctx.moveTo(left, y(0)); ctx.lineTo(right, y(0)); ctx.stroke();
+  ctx.textAlign = 'center';
+  if (bars) {
+   const spacing = (right - left) / data.length;
+   data.forEach((point, i) => {
+    const x = left + spacing * (i + .5), pos = y(values[i]);
+    ctx.fillStyle = ['#146b55', '#bd5740', values[i] < 0 ? '#bd5740' : '#387f9b'][i];
+    ctx.fillRect(x - spacing * .25, Math.min(pos, y(0)), spacing * .5, Math.max(1, Math.abs(y(0) - pos)));
+    ctx.fillStyle = '#18312e'; ctx.fillText(point.label, x, height - 10);
+    ctx.fillText(money(values[i]), x, values[i] >= 0 ? Math.max(14, pos - 8) : Math.min(height - 42, pos + 16));
+   });
+  } else {
+   const x = i => left + (right - left) * (data.length === 1 ? .5 : i / (data.length - 1));
+   ctx.strokeStyle = '#146b55'; ctx.lineWidth = 2; ctx.beginPath();
+   values.forEach((value, i) => i ? ctx.lineTo(x(i), y(value)) : ctx.moveTo(x(i), y(value))); ctx.stroke();
+   values.forEach((value, i) => {ctx.fillStyle = '#146b55'; ctx.beginPath(); ctx.arc(x(i), y(value), 2.5, 0, Math.PI * 2); ctx.fill();});
+   [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])].forEach(i => {ctx.fillStyle = '#64756d'; ctx.fillText(data[i].label, x(i), height - 10);});
+   const last = values.length - 1;
+   ctx.textAlign = 'right'; ctx.fillStyle = '#146b55';
+   ctx.fillText(money(values[last]) + '원', right, Math.max(14, y(values[last]) - 10));
+  }
+ }
+ function redraw() {draw('cash-chart', 'cash-data', false); draw('profit-chart', 'profit-data', true);}
+ redraw(); window.addEventListener('resize', redraw);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<section class="panel auth-panel"><div class="auth-heading"><span class="tag">BPMS 쉬운장부</span><h1>신규 사용자 등록</h1><p class="muted">계정과 업체 정보를 등록하고 쉬운장부를 시작하세요.</p><p class="muted">모든 항목은 필수 입력입니다.</p></div>
+<form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="auth-field"><label for="{{ field.id_for_label }}">{{ field.label }} <span aria-hidden="true">*</span></label>{% if field.name == 'username' %}<div class="username-control">{{ field }}<button type="button" class="secondary" id="check-username" data-url="{% url 'check_username' %}">중복확인</button></div><p id="username-status" class="help-text" role="status" aria-live="polite">아이디를 입력한 뒤 중복확인을 눌러주세요.</p>{% else %}{{ field }}{% endif %}{{ field.errors }}{% if field.help_text %}<div class="help-text">{{ field.help_text }}</div>{% endif %}</div>{% endfor %}<button class="auth-submit" type="submit">사용자 등록</button></form>
+{% if system_mode %}<p class="auth-bottom"><a href="{% url 'member_list' %}">회원현황으로 돌아가기</a></p>{% else %}<p class="auth-bottom">이미 계정이 있나요? <a href="{% url 'login' %}">로그인하기</a></p>{% endif %}</section>
+<style>.username-control{display:flex;gap:10px;align-items:stretch}.username-control input{flex:1;min-width:0}.username-control button{flex-shrink:0;white-space:nowrap}.username-control button:disabled{opacity:.6;cursor:wait}.help-text.income{color:var(--green)}.help-text.expense{color:#bd5740}</style>
+<script>
+(() => {
+  const input = document.getElementById('id_username');
+  const button = document.getElementById('check-username');
+  const status = document.getElementById('username-status');
+  let generation = 0;
+  const show = (text, ok) => {
+    status.textContent = text;
+    status.className = 'help-text ' + (ok ? 'income' : 'expense');
+  };
+  input.setAttribute('aria-describedby', 'username-status');
+  input.addEventListener('input', () => {
+    generation++;
+    input.setCustomValidity('');
+    button.disabled = false;
+    status.textContent = '아이디가 변경되었습니다. 중복확인을 다시 해주세요.';
+    status.className = 'help-text';
+  });
+  button.addEventListener('click', async () => {
+    input.setCustomValidity('');
+    if (!input.value.trim()) {
+      show('아이디를 먼저 입력하세요.', false);
+      input.focus();
+      return;
+    }
+    if (!input.reportValidity()) return;
+    const current = ++generation;
+    button.disabled = true;
+    status.textContent = '아이디를 확인하고 있습니다…';
+    status.className = 'help-text';
+    try {
+      const url = new URL(button.dataset.url, window.location.origin);
+      url.searchParams.set('username', input.value);
+      const response = await fetch(url, {cache: 'no-store', credentials: 'same-origin', headers: {'Accept': 'application/json'}});
+      if (!response.ok) throw new Error('request failed');
+      const result = await response.json();
+      if (current !== generation) return;
+      show(result.message, result.available);
+      input.setCustomValidity(result.available ? '' : result.message);
+    } catch (error) {
+      if (current === generation) show('확인하지 못했습니다. 잠시 후 중복확인을 다시 눌러주세요.', false);
+    } finally {
+      if (current === generation) button.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

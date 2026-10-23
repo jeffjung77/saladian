@@ -12,3 +12,5 @@ venv/
 staticfiles/
 .idea/
 .vscode/
+
+private_uploads/

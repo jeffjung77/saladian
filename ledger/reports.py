@@ -33,10 +33,17 @@ def voucher_postings(voucher, accounts):
         reason = '계정과목 또는 상대계정 확인이 필요합니다.'
     elif voucher.kind in (Voucher.Kind.INCOME, Voucher.Kind.EXPENSE):
         primary = -voucher.amount if voucher.kind == Voucher.Kind.INCOME else voucher.amount
+        deductible = voucher.deductible_vat
+        tax_code = '2107' if voucher.kind == Voucher.Kind.INCOME else '1209'
+        tax_net = -voucher.vat_amount if voucher.kind == Voucher.Kind.INCOME else deductible
+        if voucher.kind == Voucher.Kind.EXPENSE:
+            primary += voucher.vat_amount - deductible
         postings = [
             {'account_id': voucher.account_master_id, 'net': primary, 'memo': voucher.memo, 'row': None, 'opposite': str(voucher.settlement_account)},
-            {'account_id': voucher.settlement_account_id, 'net': -primary, 'memo': voucher.memo, 'row': None, 'opposite': str(voucher.account_master)},
+            {'account_id': voucher.settlement_account_id, 'net': -voucher.gross_amount if voucher.kind == Voucher.Kind.EXPENSE else voucher.gross_amount, 'memo': voucher.memo, 'row': None, 'opposite': str(voucher.account_master)},
         ]
+        if tax_net:
+            postings.append({'account_id': tax_code, 'net': tax_net, 'memo': voucher.memo, 'row': None, 'opposite': str(voucher.settlement_account)})
     else:
         reason = '전표 구분을 확인하세요.'
     if any(p['account_id'] not in accounts or account_group(accounts[p['account_id']]) is None for p in postings):
@@ -50,7 +57,7 @@ def collect_balances(vouchers):
     balances = defaultdict(lambda: ZERO)
     excluded = []
     included_count = 0
-    for voucher in vouchers.select_related('account_master', 'settlement_account').prefetch_related('journal_lines__account'):
+    for voucher in vouchers.select_related('account_master', 'settlement_account', 'counterparty').prefetch_related('journal_lines__account'):
         postings, reason = voucher_postings(voucher, accounts)
         if reason:
             excluded.append({'voucher': voucher, 'reason': reason})
@@ -65,12 +72,13 @@ def balance_side(net):
     return '차변' if net > 0 else '대변' if net < 0 else '—'
 
 
-def account_ledger(account, start, end):
+def account_ledger(account, start, end, *, vouchers=None):
     accounts = {a.pk: a for a in Account.objects.all()}
     opening = debit = credit = ZERO
     rows, excluded = [], []
     included = set()
-    vouchers = Voucher.objects.filter(date__lte=end).select_related('account_master', 'settlement_account').prefetch_related('journal_lines__account').order_by('date', 'pk')
+    source = Voucher.objects.all() if vouchers is None else vouchers
+    vouchers = source.filter(date__lte=end).select_related('account_master', 'settlement_account', 'counterparty').prefetch_related('journal_lines__account').order_by('date', 'pk')
     for voucher in vouchers:
         postings, reason = voucher_postings(voucher, accounts)
         if reason:
@@ -119,17 +127,20 @@ def build_income(accounts, balances):
             'pretax_profit': pretax, 'net_profit': pretax - totals['법인세비용']}
 
 
-def income_statement(start, end):
-    vouchers = Voucher.objects.filter(date__gte=start, date__lte=end, is_closing=False)
+def income_statement(start, end, *, vouchers=None):
+    source = Voucher.objects.all() if vouchers is None else vouchers
+    period_vouchers = source.filter(date__gte=start, date__lte=end)
+    vouchers = period_vouchers.filter(is_closing=False)
     accounts, balances, excluded, included = collect_balances(vouchers)
     result = build_income(accounts, balances)
     result.update(excluded=excluded, included_count=included,
-                  closing_count=Voucher.objects.filter(date__gte=start, date__lte=end, is_closing=True).count())
+                  closing_count=period_vouchers.filter(is_closing=True).count())
     return result
 
 
-def balance_sheet(as_of):
-    accounts, balances, excluded, included = collect_balances(Voucher.objects.filter(date__lte=as_of))
+def balance_sheet(as_of, *, vouchers=None):
+    source = Voucher.objects.all() if vouchers is None else vouchers
+    accounts, balances, excluded, included = collect_balances(source.filter(date__lte=as_of))
     sections = []
     totals = {}
     for element in ('자산', '부채', '자본'):

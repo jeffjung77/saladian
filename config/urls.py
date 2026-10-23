@@ -16,8 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from ledger.auth_views import LedgerLoginView, LedgerLogoutView, signup, check_username
 
 urlpatterns = [
+    path('accounts/login/', LedgerLoginView.as_view(), name='login'),
+    path('accounts/logout/', LedgerLogoutView.as_view(), name='logout'),
+    path('accounts/signup/', signup, name='signup'),
+    path('accounts/check-username/', check_username, name='check_username'),
     path('', include('ledger.urls')),
     path('admin/', admin.site.urls),
 ]

@@ -1,21 +1,21 @@
 from datetime import date
-from django.test import TestCase
+from .test_helpers import AuthenticatedLedgerTestCase
 from django.urls import reverse
 from .models import Account, Voucher, JournalLine
 from .reports import balance_sheet, income_statement
 from .tests import journal_data
 
 
-class FinancialReportTests(TestCase):
+class FinancialReportTests(AuthenticatedLedgerTestCase):
     def journal(self, debits, credits, when='2026-01-01', closing=False):
         data = journal_data(debits, credits, date=when)
         if closing:
             data['is_closing'] = 'on'
-        self.assertRedirects(self.client.post(reverse('voucher_new'), data), '/')
+        self.assertRedirects(self.client.post(reverse('voucher_new'), data), reverse('dashboard'))
         return Voucher.objects.latest('pk')
 
     def simple(self, code, amount, kind, when='2026-01-01', settlement='1101'):
-        return Voucher.objects.create(date=when, kind=kind, account=Account.objects.get(pk=code).name,
+        return Voucher.objects.create(owner=self.user, date=when, kind=kind, account=Account.objects.get(pk=code).name,
                                       account_master_id=code, settlement_account_id=settlement, amount=amount)
 
     def test_as_of_cumulative_and_period_boundaries(self):
@@ -82,7 +82,7 @@ class FinancialReportTests(TestCase):
         self.assertEqual(bs['difference'], 0)
 
     def test_missing_accounts_are_explicitly_excluded_and_can_be_fixed(self):
-        voucher = Voucher.objects.create(date='2026-01-01', kind='income', account='매출', amount=1000)
+        voucher = Voucher.objects.create(owner=self.user, date='2026-01-01', kind='income', account='매출', amount=1000)
         response = self.client.get(reverse('balance_sheet'), {'as_of': '2026-01-31'})
         self.assertEqual(len(response.context['report']['excluded']), 1)
         self.assertContains(response, '잠정 집계')
@@ -99,7 +99,7 @@ class FinancialReportTests(TestCase):
         self.assertEqual(bs['equity'], 1000)
 
     def test_invalid_journal_and_unknown_classification_not_silently_counted(self):
-        voucher = Voucher.objects.create(date='2026-01-01', kind='journal', account='복합전표', amount=1000)
+        voucher = Voucher.objects.create(owner=self.user, date='2026-01-01', kind='journal', account='복합전표', amount=1000)
         JournalLine.objects.create(voucher=voucher, row=1, side='debit', account_id='1101', amount=1000)
         self.assertEqual(len(balance_sheet(date(2026, 1, 31))['excluded']), 1)
         JournalLine.objects.create(voucher=voucher, row=1, side='credit', account_id='5001', amount=1000)
@@ -124,7 +124,7 @@ class FinancialReportTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.context['report']['included_count'], 0)
             self.assertContains(response, '반영 가능한 전표가 없습니다')
-            self.assertContains(self.client.get('/'), reverse(name))
+            self.assertContains(self.client.get(reverse('dashboard')), reverse(name))
 
     def test_single_entry_requires_confirmed_settlement_and_no_duplicate_reporting(self):
         data = {'date': '2026-01-01', 'kind': 'income', 'account_master': '5001', 'amount': '1000'}
@@ -134,7 +134,7 @@ class FinancialReportTests(TestCase):
         response = self.client.post(reverse('sales_new'), data)
         self.assertIn('settlement_account', response.context['form'].errors)
         data['settlement_account'] = '1201'
-        self.assertRedirects(self.client.post(reverse('sales_new'), data), '/')
+        self.assertRedirects(self.client.post(reverse('sales_new'), data), reverse('dashboard'))
         pl = income_statement(date(2026, 1, 1), date(2026, 1, 1))
         self.assertEqual(pl['net_profit'], 1000)
         self.assertEqual(pl['included_count'], 1)

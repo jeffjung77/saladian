@@ -1,9 +1,132 @@
 from django import forms
 from decimal import Decimal
-from .models import Voucher, Account
+from .models import Voucher, Account, Counterparty
+import re
+from .vat import VAT_FIELDS
+from .widgets import MoneyInput
+from .account_settings import visible_accounts, selectable_accounts, CATEGORIES
 
 
-class VoucherForm(forms.ModelForm):
+class AccountForm(forms.ModelForm):
+    category = forms.ChoiceField(label='소분류', choices=[('', '분류 선택')] + [(category, f'{element} · {category}') for category, element in CATEGORIES.items()])
+
+    def clean_code(self):
+        code = self.cleaned_data['code']
+        if not re.fullmatch(r'[0-9]{4}', code):
+            raise forms.ValidationError('계정코드는 숫자 4자리로 입력하세요.')
+        return code
+
+    def save(self, commit=True):
+        account = super().save(commit=False)
+        account.element = CATEGORIES[self.cleaned_data['category']]
+        if commit:
+            account.save()
+        return account
+
+    class Meta:
+        model = Account
+        fields = ['code', 'name', 'category', 'section']
+        help_texts = {'code': '중복되지 않는 숫자 4자리를 입력하세요.', 'section': '필요한 경우 유동자산·비유동자산 등의 중분류를 입력하세요.'}
+
+
+class VatFormMixin:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in ('vat_amount', 'vat_deductible'):
+            self.fields[name].widget = MoneyInput(attrs={'min': 0, 'step': 1})
+
+    def clean(self):
+        data = super().clean()
+        for name in ('vat_amount', 'vat_deductible'):
+            if name not in self.errors:
+                data[name] = data.get(name) or Decimal(0)
+        tax, deductible = data.get('vat_amount', 0), data.get('vat_deductible', 0)
+        code, trade = data.get('vat_code'), data.get('vat_trade')
+        if not code:
+            if any(data.get(name) for name in VAT_FIELDS[1:] if name != 'vat_trade' or not self.fields['vat_trade'].disabled):
+                self.add_error('vat_code', '부가세 정보를 입력하려면 부가세 코드를 선택하세요.')
+            return data
+        if not trade:
+            self.add_error('vat_trade', '매출 또는 매입을 선택하세요.')
+        if not data.get('vat_document') and code != 'X':
+            self.add_error('vat_document', '증빙 종류를 선택하세요.')
+        if not code.startswith('T') and tax:
+            self.add_error('vat_amount', '면세·영세율·대상 외 거래의 부가세 금액은 0원이어야 합니다.')
+        deduction = data.get('vat_deduction')
+        if trade == 'S':
+            if deduction or deductible:
+                self.add_error('vat_deduction', '매출에는 매입세액 공제 구분을 입력하지 않습니다.')
+        elif trade == 'P':
+            if not deduction:
+                self.add_error('vat_deduction', '매입세액 공제 구분을 선택하세요.')
+            if not code.startswith('T') and deduction != 'C04':
+                self.add_error('vat_deduction', '부가세가 없는 매입은 C04를 선택하세요.')
+            if deduction in ('C04', 'C09') and tax:
+                self.add_error('vat_deduction', '부가세가 있으면 공제·불공제·공통매입 안분을 확정한 뒤 저장하세요.')
+            if deduction in ('C02', 'C03') and not data.get('vat_reason'):
+                self.add_error('vat_reason', '불공제 또는 안분 사유를 입력하세요.')
+        if deductible and deduction != 'C03':
+            self.add_error('vat_deductible', '공통매입 안분(C03)인 경우에만 입력하세요.')
+        if tax is not None and deductible is not None and deductible > tax:
+            self.add_error('vat_deductible', '공제할 세액은 부가세 금액을 초과할 수 없습니다.')
+        return data
+
+
+class CounterpartyForm(forms.ModelForm):
+    def __init__(self, *args, user, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance.owner = user
+        for name in ('name', 'business_number', 'representative', 'address'):
+            self.fields[name].required = True
+
+    def clean_business_certificate(self):
+        uploaded = self.cleaned_data.get('business_certificate')
+        if uploaded and hasattr(uploaded, 'content_type'):
+            if not uploaded.name.lower().endswith('.pdf') or uploaded.size > 10 * 1024 * 1024:
+                raise forms.ValidationError('10MB 이하의 PDF 파일을 첨부해 주세요.')
+            signature = uploaded.read(5)
+            uploaded.seek(0)
+            if signature != b'%PDF-':
+                raise forms.ValidationError('올바른 PDF 파일을 첨부해 주세요.')
+        return uploaded
+
+    def clean_name(self):
+        name = self.cleaned_data['name']
+        if Counterparty.objects.filter(owner=self.instance.owner, name=name).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('이미 등록된 거래처명입니다.')
+        return name
+
+    def clean_business_number(self):
+        value = self.cleaned_data['business_number']
+        if not value:
+            return ''
+        if not re.fullmatch(r'(?:[0-9]{10}|[0-9]{3}-[0-9]{2}-[0-9]{5})', value):
+            raise forms.ValidationError('숫자 10자리 또는 123-45-67890 형식으로 입력하세요.')
+        digits = value.replace('-', '')
+        return f'{digits[:3]}-{digits[3:5]}-{digits[5:]}'
+
+    class Meta:
+        model = Counterparty
+        fields = ['kind', 'name', 'business_number', 'representative', 'contact_name', 'phone', 'email', 'address', 'bank_name', 'bank_account', 'memo', 'business_certificate']
+        widgets = {'business_certificate': forms.FileInput(attrs={'accept': '.pdf,application/pdf'}), 'memo': forms.Textarea(attrs={'rows': 3}), 'phone': forms.TextInput(attrs={'type': 'tel'})}
+
+
+class CounterpartySelectionMixin:
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        self.fields['counterparty'].queryset = Counterparty.objects.filter(owner=user) if user is not None and user.is_authenticated else Counterparty.objects.none()
+        self.fields['counterparty'].empty_label = '거래처 미지정'
+
+    def save(self, commit=True):
+        voucher = super().save(commit=False)
+        voucher.partner = voucher.counterparty.name if voucher.counterparty_id else ''
+        if commit:
+            voucher.save()
+        return voucher
+
+
+class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
     account_master = forms.ModelChoiceField(label='계정과목', queryset=Account.objects.all(), empty_label='계정코드 · 계정과목을 선택하세요')
     settlement_account = forms.ModelChoiceField(label='상대계정', queryset=Account.objects.filter(element__in=['자산', '부채', '자본']), empty_label='현금·예금·외상계정 등을 선택하세요', help_text='수입은 상대계정 차변 / 선택 계정과목 대변, 지출은 선택 계정과목 차변 / 상대계정 대변으로 재무제표에 반영합니다.')
 
@@ -23,6 +146,16 @@ class VoucherForm(forms.ModelForm):
             self.fields['kind'].disabled = True
         if entry_type in (Voucher.EntryType.SALES, Voucher.EntryType.EXPENSE):
             self.initial['kind'] = self.fields['kind'].initial
+            self.fields['vat_trade'].initial = 'S' if entry_type == Voucher.EntryType.SALES else 'P'
+            self.initial['vat_trade'] = self.fields['vat_trade'].initial
+            self.fields['vat_trade'].disabled = True
+        self.fields['amount'].label = '공급가액 / 부가세 제외 금액(원)'
+        for name in ('account_master', 'settlement_account'):
+            existing = getattr(self.instance, f'{name}_id') if self.instance.pk else None
+            allowed = selectable_accounts(self.user, [existing])
+            self.fields[name].queryset = self.fields[name].queryset.filter(pk__in=allowed)
+        if not self.instance.pk and not self.fields['account_master'].queryset.filter(pk=self.initial.get('account_master')).exists():
+            self.initial.pop('account_master', None)
 
     def save(self, commit=True):
         voucher = super().save(commit=False)
@@ -35,22 +168,29 @@ class VoucherForm(forms.ModelForm):
         data = super().clean()
         if data.get('account_master') and data.get('settlement_account') and data['account_master'] == data['settlement_account']:
             self.add_error('settlement_account', '상대계정은 계정과목과 다르게 선택하세요.')
+        if data.get('vat_code') and data.get('vat_trade') != ('S' if data.get('kind') == Voucher.Kind.INCOME else 'P'):
+            self.add_error('vat_trade', '수입은 매출, 지출은 매입으로 선택하세요.')
+        if data.get('amount') and data.get('vat_amount') and data['amount'] + data['vat_amount'] > Decimal('99999999999999'):
+            self.add_error('vat_amount', '공급가액과 부가세 합계는 99,999,999,999,999원 이하여야 합니다.')
+        if not data.get('vat_code'):
+            # Disabled trade selectors may have their default value on legacy non-VAT entries.
+            data['vat_trade'] = ''
         return data
 
     class Meta:
         model = Voucher
-        fields = ['date', 'kind', 'account_master', 'settlement_account', 'partner', 'amount', 'memo']
+        fields = ['date', 'kind', 'account_master', 'settlement_account', 'counterparty', 'amount'] + VAT_FIELDS + ['memo']
         widgets = {
             'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'amount': forms.NumberInput(attrs={'min': 1, 'step': 1, 'placeholder': '0'}),
+            'amount': MoneyInput(attrs={'min': 1, 'step': 1, 'placeholder': '0'}),
             'memo': forms.Textarea(attrs={'rows': 3, 'placeholder': '거래 내용을 입력하세요'}),
         }
 
 
-class JournalHeaderForm(forms.ModelForm):
+class JournalHeaderForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
     class Meta:
         model = Voucher
-        fields = ['date', 'partner', 'memo', 'is_closing']
+        fields = ['date', 'counterparty'] + VAT_FIELDS + ['memo', 'is_closing']
         help_texts = {'is_closing': '수익·비용을 이익잉여금으로 대체하는 결산전표에만 선택하세요. 대차대조표에는 반영하고 손익계산서에서는 제외합니다.'}
         widgets = {
             'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
@@ -59,16 +199,52 @@ class JournalHeaderForm(forms.ModelForm):
 
 
 class JournalRowForm(forms.Form):
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        for side in ('debit', 'credit'):
+            name = f'{side}_account'
+            self.fields[name].queryset = selectable_accounts(user, [self.initial.get(name)])
+            if not self.is_bound and self.initial.get(name):
+                account = self.fields[name].queryset.filter(pk=self.initial[name]).first()
+                if account:
+                    self.initial[f'{side}_code'] = account.pk
+                    self.initial[f'{side}_name'] = account.name
+    debit_code = forms.CharField(label='차변 계정코드', max_length=4, required=False, widget=forms.TextInput(attrs={'inputmode': 'numeric', 'placeholder': '계정코드'}))
+    debit_name = forms.CharField(label='차변 계정과목명 검색', max_length=100, required=False, widget=forms.TextInput(attrs={'placeholder': '계정과목명 직접 입력', 'autocomplete': 'off'}))
+    credit_code = forms.CharField(label='대변 계정코드', max_length=4, required=False, widget=forms.TextInput(attrs={'inputmode': 'numeric', 'placeholder': '계정코드'}))
+    credit_name = forms.CharField(label='대변 계정과목명 검색', max_length=100, required=False, widget=forms.TextInput(attrs={'placeholder': '계정과목명 직접 입력', 'autocomplete': 'off'}))
     debit_account = forms.ModelChoiceField(label='차변 계정과목', queryset=Account.objects.all(), required=False, empty_label='계정과목 선택')
-    debit_amount = forms.DecimalField(label='차변 금액', required=False, min_value=1, max_digits=14, decimal_places=0, widget=forms.NumberInput(attrs={'min': 1, 'step': 1}))
+    debit_amount = forms.DecimalField(label='차변 금액', required=False, min_value=1, max_digits=14, decimal_places=0, widget=MoneyInput(attrs={'min': 1, 'step': 1}))
     credit_account = forms.ModelChoiceField(label='대변 계정과목', queryset=Account.objects.all(), required=False, empty_label='계정과목 선택')
-    credit_amount = forms.DecimalField(label='대변 금액', required=False, min_value=1, max_digits=14, decimal_places=0, widget=forms.NumberInput(attrs={'min': 1, 'step': 1}))
+    credit_amount = forms.DecimalField(label='대변 금액', required=False, min_value=1, max_digits=14, decimal_places=0, widget=MoneyInput(attrs={'min': 1, 'step': 1}))
     memo = forms.CharField(label='라인 적요', required=False, max_length=1000, widget=forms.TextInput(attrs={'placeholder': '이 행의 공통 거래 내용 (선택)'}))
 
     def clean(self):
         data = super().clean()
         for side in ['debit', 'credit']:
             account, amount = data.get(f'{side}_account'), data.get(f'{side}_amount')
+            code, name = data.get(f'{side}_code'), data.get(f'{side}_name')
+            available = self.fields[f'{side}_account'].queryset
+            if code:
+                candidate = available.filter(pk=code).first()
+                if not candidate:
+                    self.add_error(f'{side}_code', '선택할 수 없는 계정코드입니다.')
+                elif account and account.pk != candidate.pk:
+                    self.add_error(f'{side}_code', '계정코드와 선택한 계정과목이 일치하지 않습니다.')
+                else:
+                    account = candidate
+            if name:
+                if account:
+                    if name not in (account.name, str(account)):
+                        self.add_error(f'{side}_name', '계정과목명과 선택한 계정이 일치하지 않습니다.')
+                else:
+                    candidates = list(available.filter(name=name)[:2])
+                    if len(candidates) == 1:
+                        account = candidates[0]
+                    else:
+                        self.add_error(f'{side}_name', '목록에서 계정과목을 선택하거나 정확한 계정코드를 입력하세요.')
+            if account:
+                data[f'{side}_account'] = account
             if account is not None and amount is None and f'{side}_amount' not in self.errors:
                 self.add_error(f'{side}_amount', '계정과목에 해당하는 금액을 입력하세요.')
             if amount is not None and account is None and f'{side}_account' not in self.errors:
@@ -119,6 +295,9 @@ class IncomeStatementForm(PeriodForm):
 
 
 class AccountLedgerForm(IncomeStatementForm):
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['account'].queryset = visible_accounts(user)
     field_order = ['account', 'start', 'end']
     account = forms.ModelChoiceField(label='계정과목', queryset=Account.objects.all(), empty_label='계정코드 · 계정과목을 선택하세요')
 
@@ -126,7 +305,9 @@ class AccountLedgerForm(IncomeStatementForm):
 class PartnerLedgerForm(PeriodForm):
     partner = forms.ChoiceField(label='거래처', choices=())
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        names = Voucher.objects.exclude(partner='').order_by('partner').values_list('partner', flat=True).distinct()
-        self.fields['partner'].choices = [('', '거래처를 선택하세요'), ('unassigned:', '거래처 미입력')] + [('name:' + name, name) for name in names]
+        vouchers = Voucher.objects.filter(owner=user) if user is not None and user.is_authenticated else Voucher.objects.none()
+        masters = Counterparty.objects.filter(owner=user) if user is not None and user.is_authenticated else Counterparty.objects.none()
+        names = vouchers.filter(counterparty__isnull=True).exclude(partner='').order_by('partner').values_list('partner', flat=True).distinct()
+        self.fields['partner'].choices = [('', '거래처를 선택하세요'), ('unassigned:', '거래처 미입력')] + [(f'master:{partner.pk}', partner.name) for partner in masters] + [('name:' + name, name + ' (기존 입력)') for name in names]

@@ -1,0 +1,38 @@
+<style>
+.main-menu{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.main-menu .btn,.main-menu summary,.main-menu button{white-space:nowrap;padding:10px 14px}.nav-group{position:relative}.nav-group summary{display:block;border-radius:8px;background:#eaf0ec;cursor:pointer;list-style:none}.nav-group summary::-webkit-details-marker{display:none}.nav-group summary::after{content:' ▾';font-size:12px}.nav-group[open] summary{background:#dcebe2}.nav-group summary:focus-visible,.nav-dropdown a:focus-visible{outline:2px solid var(--green);outline-offset:2px}.nav-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:180px;padding:6px;background:white;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #18312e1a;z-index:100}.nav-dropdown a{display:block;padding:10px 12px;border-radius:6px;color:var(--ink);text-decoration:none;white-space:nowrap}.nav-dropdown a:hover,.nav-dropdown a:focus{background:#edf4ef}.nav-user{font-size:12px}.nav-logout{margin:0}@media(max-width:700px){.main-menu{width:100%;gap:6px}.main-menu .btn,.main-menu summary,.main-menu button{padding:9px 11px}.nav-dropdown{right:auto;left:0}.nav-user{margin-left:auto}}
+</style>
+{% if user.is_authenticated %}
+<div class="main-menu" aria-label="주 메뉴">
+<a href="{% url 'business_overview' %}" class="btn secondary">사업현황</a>
+<a href="{% url 'dashboard' %}" class="btn secondary">전표 · 집계</a>
+<details class="nav-group"><summary>보고서</summary><div class="nav-dropdown">
+<a href="{% url 'balance_sheet' %}">대차대조표</a>
+<a href="{% url 'income_statement' %}">손익계산서</a>
+<a href="{% url 'account_ledger' %}">계정별원장</a>
+<a href="{% url 'partner_ledger' %}">거래처별 원장</a>
+</div></details>
+{% if user.is_staff or user.is_superuser %}<details class="nav-group"><summary>관리</summary><div class="nav-dropdown">
+<a href="{% url 'counterparties' %}">거래처관리</a>
+<a href="{% url 'accounts' %}">계정과목표</a>
+</div></details>
+{% endif %}{% if user.is_superuser %}<details class="nav-group"><summary>시스템관리</summary><div class="nav-dropdown">
+<a href="{% url 'system_signup' %}">신규회원가입</a>
+<a href="{% url 'member_list' %}">회원현황</a>
+</div></details>
+{% endif %}
+<span class="muted nav-user">{{ user.username }}</span>
+<form class="nav-logout" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="secondary" type="submit">로그아웃</button></form>
+</div>
+<script>
+(() => {
+ const groups = document.querySelectorAll('.nav-group');
+ groups.forEach(group => group.addEventListener('toggle', () => {
+  if (group.open) groups.forEach(other => {if (other !== group) other.open = false;});
+ }));
+ document.addEventListener('click', event => {groups.forEach(group => {if (!group.contains(event.target)) group.open = false;});});
+ document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') groups.forEach(group => {if (group.open) {group.open = false; group.querySelector('summary').focus();}});
+ });
+})();
+</script>
+{% else %}<a class="btn secondary" href="{% url 'login' %}">로그인</a>{% endif %}

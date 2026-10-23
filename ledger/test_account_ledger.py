@@ -1,18 +1,18 @@
 from datetime import date
-from django.test import TestCase
+from .test_helpers import AuthenticatedLedgerTestCase
 from django.urls import reverse
 from .models import Account, Voucher, JournalLine
 from .reports import account_ledger, balance_sheet
 from .tests import journal_data
 
 
-class AccountLedgerTests(TestCase):
+class AccountLedgerTests(AuthenticatedLedgerTestCase):
     def journal(self, debits=None, credits=None, when='2026-10-01', memo='전표적요', line_memo='', closing=False):
         data = journal_data(debits, credits, date=when, memo=memo)
         data['lines-0-memo'] = line_memo
         if closing:
             data['is_closing'] = 'on'
-        self.assertRedirects(self.client.post(reverse('voucher_new'), data), '/')
+        self.assertRedirects(self.client.post(reverse('voucher_new'), data), reverse('dashboard'))
         return Voucher.objects.latest('pk')
 
     def ledger(self, code='1101', start=date(2026, 10, 1), end=date(2026, 10, 31)):
@@ -50,8 +50,8 @@ class AccountLedgerTests(TestCase):
         self.assertEqual(report['closing_side'], '—')
 
     def test_simple_entries_primary_and_settlement_are_included_once(self):
-        Voucher.objects.create(date='2026-10-01', kind='income', account='매출-용역', account_master_id='5001', settlement_account_id='1201', amount=1000, memo='외상 매출')
-        Voucher.objects.create(date='2026-10-01', kind='expense', account='임차료', account_master_id='6505', settlement_account_id='1101', amount=200)
+        Voucher.objects.create(owner=self.user, date='2026-10-01', kind='income', account='매출-용역', account_master_id='5001', settlement_account_id='1201', amount=1000, memo='외상 매출')
+        Voucher.objects.create(owner=self.user, date='2026-10-01', kind='expense', account='임차료', account_master_id='6505', settlement_account_id='1101', amount=200)
         self.assertEqual(self.ledger('1201')['debit'], 1000)
         self.assertEqual(self.ledger('5001')['credit'], 1000)
         self.assertEqual(self.ledger('6505')['debit'], 200)
@@ -73,8 +73,8 @@ class AccountLedgerTests(TestCase):
         self.assertContains(response, '라인 공통 적요')
 
     def test_invalid_sources_warn_including_opening_period(self):
-        Voucher.objects.create(date='2026-09-01', kind='income', account='미확인', amount=100)
-        broken = Voucher.objects.create(date='2026-10-01', kind='journal', account='복합전표', amount=100)
+        Voucher.objects.create(owner=self.user, date='2026-09-01', kind='income', account='미확인', amount=100)
+        broken = Voucher.objects.create(owner=self.user, date='2026-10-01', kind='journal', account='복합전표', amount=100)
         JournalLine.objects.create(voucher=broken, row=1, side='debit', account_id='1101', amount=100)
         self.journal([('1102', '100')], [('3101', '100')], when='2026-11-01')
         report = self.ledger()
@@ -102,4 +102,4 @@ class AccountLedgerTests(TestCase):
         initial = self.client.get(reverse('account_ledger'))
         self.assertIsNone(initial.context['report'])
         self.assertFalse(initial.context['form'].errors)
-        self.assertContains(self.client.get('/'), reverse('account_ledger'))
+        self.assertContains(self.client.get(reverse('dashboard')), reverse('account_ledger'))

@@ -1,0 +1,14 @@
+<div class="notice">
+<strong>부가세 입력</strong>
+<p>과세(T)·면세(E)·영세율(Z)·대상 외(X) 중 거래에 맞는 코드를 선택하세요. 코드는 자체 관리용이며 홈택스 공식 신고 코드가 아닙니다. 코드 미지정 전표는 기존 방식으로 저장됩니다.</p>
+{% if entry_type == 'other' %}<p>기타전표는 공급가액·부가세를 포함한 전체 분개를 직접 입력합니다. 매출부가세(2107)는 대변, 공제할 매입부가세(1209)는 차변에 별도 행으로 입력하세요. 부가세 입력란의 금액을 분개에 다시 자동 가산하지 않습니다.</p>{% else %}<p>공급가액과 부가세를 나누어 입력하세요. 상대계정에는 두 금액의 합계가 반영됩니다. 매출부가세는 2107, 공제할 매입부가세는 1209로 별도 반영하며, 불공제 세액은 선택한 비용에 포함합니다.</p><p>합계금액: <strong id="vat-gross-total">0</strong>원</p>{% endif %}
+<p>면세·영세율·대상 외의 부가세는 0원입니다. 공통매입(C03)은 공제할 세액과 안분 사유를 입력하세요. 검토 필요(C09)는 세액이 있으면 공제 여부를 확정한 후 저장하세요.</p>
+</div>
+{% if entry_type != 'other' %}<script>
+(() => {
+ const amount = document.getElementById('id_amount'), vat = document.getElementById('id_vat_amount'), output = document.getElementById('vat-gross-total');
+ if (!amount || !vat) return;
+ function update() {const a = amount.value.replace(/,/g, '') || '0', b = vat.value.replace(/,/g, '') || '0'; output.textContent = /^\d+$/.test(a) && /^\d+$/.test(b) ? (BigInt(a) + BigInt(b)).toLocaleString('ko-KR') : '—';}
+ amount.addEventListener('input', update); vat.addEventListener('input', update); update();
+})();
+</script>{% endif %}
