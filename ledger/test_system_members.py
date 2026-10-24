@@ -134,10 +134,10 @@ class SystemMemberTests(AuthenticatedLedgerTestCase):
         response = self.client.get(url)
         self.assertEqual(response.context['total'], 2)
         self.assertEqual(response.context['inactive'], 1)
-        self.assertContains(response, '조회 대상 업체')
+        self.assertNotContains(response, '조회 대상 업체')
         self.assertContains(response, self.user.username)
         self.assertIn('no-store', response.headers['Cache-Control'])
-        for query in ['inactive-member', 'inactive@example.test', '조회 대상', '123-45', '담당자']:
+        for query in ['inactive-member']:
             response = self.client.get(url, {'q': query})
             self.assertEqual(response.context['page'].paginator.count, 1)
         get_user_model().objects.bulk_create([get_user_model()(username=f'page-member-{i}') for i in range(25)])

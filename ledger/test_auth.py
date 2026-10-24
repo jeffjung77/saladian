@@ -28,7 +28,7 @@ class AuthenticationTests(TestCase):
             self.assertEqual(response.status_code, 302)
             self.assertTrue(response.url.startswith(reverse('login') + '?next='))
         self.assertContains(self.client.get(reverse('login')), reverse('signup'))
-        self.assertContains(self.client.get(reverse('signup')), '신규 사용자 등록')
+        self.assertContains(self.client.get(reverse('signup')), '신규 회원가입')
         self.assertNotContains(self.client.get(reverse('login')), '우리 가게의 거래 한눈에')
 
     def test_signup_hashes_password_and_does_not_grant_privileges_or_existing_data(self):
@@ -55,20 +55,32 @@ class AuthenticationTests(TestCase):
         response = self.client.get(reverse('signup'))
         fields = response.context['form'].fields
         self.assertEqual(set(fields), {'username', 'grade', 'email', 'company_name', 'business_number', 'contact_name', 'contact_phone', 'password1', 'password2'})
-        self.assertTrue(all(field.required for field in fields.values()))
+        hidden_fields = {'company_name', 'business_number', 'contact_name', 'email', 'contact_phone'}
+        self.assertTrue(all(field.required for name, field in fields.items() if name not in hidden_fields))
         for name in fields:
-            if fields[name].disabled:
+            if fields[name].disabled or name in hidden_fields:
                 continue
             data = self.signup_data()
             data[name] = ''
             response = self.client.post(reverse('signup'), data)
             self.assertEqual(response.status_code, 200)
             self.assertIn(name, response.context['form'].errors)
-        for name in ['company_name', 'contact_name']:
-            response = self.client.post(reverse('signup'), self.signup_data(**{name: '   '}))
-            self.assertIn(name, response.context['form'].errors)
         self.assertFalse(User.objects.filter(username='newmember').exists())
         self.assertFalse(BusinessProfile.objects.exists())
+
+    def test_public_signup_hides_company_fields_and_accepts_omission(self):
+        response = self.client.get(reverse('signup'))
+        data = self.signup_data()
+        for name in ['company_name', 'business_number', 'contact_name', 'email', 'contact_phone']:
+            self.assertNotContains(response, f'id="id_{name}"')
+            data.pop(name)
+        self.assertRedirects(self.client.post(reverse('signup'), data), reverse('login'))
+        profile = User.objects.get(username='newmember').business_profile
+        self.assertEqual(profile.company_name, '')
+        self.assertEqual(profile.business_number, '')
+        self.assertEqual(profile.contact_name, '')
+        self.assertEqual(profile.contact_phone, '')
+        self.assertEqual(profile.user.email, '')
 
     def test_username_availability_is_public_and_matches_registration_validation(self):
         url = reverse('check_username')
@@ -138,9 +150,9 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('_auth_user_id', self.client.session)
         response = self.client.post(reverse('login'), {'username': 'existing', 'password': TEST_PASSWORD, 'next': 'https://untrusted.example/'})
-        self.assertRedirects(response, reverse('business_overview'))
+        self.assertRedirects(response, reverse('voucher_entry'))
         self.assertContains(self.client.get(reverse('dashboard')), 'existing')
-        self.assertRedirects(self.client.get(reverse('signup')), reverse('dashboard'))
+        self.assertRedirects(self.client.get(reverse('signup')), reverse('voucher_entry'))
         self.assertEqual(self.client.get(reverse('logout')).status_code, 405)
         self.assertRedirects(self.client.post(reverse('logout')), reverse('login'))
         self.assertNotIn('_auth_user_id', self.client.session)

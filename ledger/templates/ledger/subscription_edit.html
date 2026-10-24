@@ -1,0 +1,4 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<h1>구독정보 수정</h1><section class="panel form-panel"><p><strong>회원아이디:</strong> {{ subscription.user.username }}</p>
+<form method="post">{% csrf_token %}{{ form.non_field_errors }}<div class="form-grid">{% for field in form %}<div {% if field.name == 'business_address' %}class="wide"{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }} *</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div><p class="muted">모든 항목은 필수 입력입니다.</p><button>구독정보 저장</button> <a class="btn secondary" href="{% url 'subscription_list' %}">취소</a></form></section>
+{% endblock %}

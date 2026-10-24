@@ -222,7 +222,22 @@ class EntryScreenTests(AuthenticatedLedgerTestCase):
         for name in ['sales_new', 'expense_new', 'voucher_new']:
             response = self.client.post(reverse(name), {})
             self.assertTrue(response.context['form'].errors)
-            self.assertContains(self.client.get(reverse('dashboard')), reverse(name))
+            self.assertContains(self.client.get(reverse('voucher_entry')), reverse(name))
+
+    def test_entry_and_summary_are_separate_and_require_login(self):
+        response = self.client.get(reverse('voucher_entry'))
+        self.assertContains(response, '<h1>전표입력</h1>')
+        self.assertNotContains(response, '수입 합계')
+        self.assertNotContains(response, 'name="start"')
+        for name in ['sales_new', 'expense_new', 'voucher_new']:
+            self.assertContains(response, reverse(name))
+        summary = self.client.get(reverse('dashboard'))
+        self.assertContains(summary, '<h1>전표집계</h1>')
+        self.assertContains(summary, '수입 합계')
+        self.assertContains(summary, 'name="start"')
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('voucher_entry')).status_code, 302)
+        self.assertEqual(self.client.get(reverse('dashboard')).status_code, 302)
 
 
 class JournalTests(AuthenticatedLedgerTestCase):

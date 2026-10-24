@@ -1,6 +1,10 @@
+from .excel import report_render
 from decimal import Decimal
 from datetime import timedelta
 from django.contrib import messages
+from django.conf import settings
+from django.contrib.auth.decorators import login_not_required
+from django.contrib.auth.views import redirect_to_login
 from django.db.models import Sum, Q, F
 from django.db import transaction, IntegrityError
 from django.core.paginator import Paginator
@@ -19,9 +23,23 @@ from .models import AccountPreference
 from .account_settings import visible_accounts
 
 
+@login_not_required
 def business_overview(request):
     today = timezone.localdate()
     start = today.replace(day=1)
+    if not request.user.is_authenticated:
+        if not settings.DEBUG:
+            return redirect_to_login(request.get_full_path())
+        response = render(request, 'ledger/business_overview.html', {
+            'guest_preview': True, 'today': today, 'start': start,
+            'balance': {'assets': 0, 'liabilities': 0, 'equity': 0, 'liabilities_equity': 0, 'difference': 0, 'unclosed_profit': 0},
+            'income': {'net_profit': 0, 'closing_count': 0},
+            'cash_total': 0, 'cash_amount': 0, 'bank_amount': 0, 'cash_opening': 0, 'revenue': 0, 'expense': 0,
+            'cash_points': [{'label': (start + timedelta(days=i)).strftime('%m/%d'), 'value': '0'} for i in range(today.day)],
+            'profit_points': [{'label': label, 'value': '0'} for label in ['수익', '비용', '순이익']],
+        })
+        response['Cache-Control'] = 'private, no-store'
+        return response
     source = Voucher.objects.filter(owner=request.user)
     balance = reports.balance_sheet(today, vouchers=source)
     income = reports.income_statement(start, today, vouchers=source)
@@ -91,6 +109,7 @@ def counterparty_edit(request, pk=None):
         try:
             with transaction.atomic():
                 form.save()
+                request._audit_target = str(form.instance.pk)
         except IntegrityError:
             if not Counterparty.objects.filter(owner=request.user, name=form.cleaned_data['name']).exists():
                 raise
@@ -103,25 +122,25 @@ def counterparty_edit(request, pk=None):
 
 def account_ledger(request):
     today = timezone.localdate()
-    form = AccountLedgerForm(request.GET if request.GET else None, initial={'start': today.replace(month=1, day=1), 'end': today}, user=request.user)
+    form = AccountLedgerForm(request.GET if any(key != 'export' for key in request.GET) else None, initial={'start': today.replace(month=1, day=1), 'end': today}, user=request.user)
     report = None
     if form.is_bound and form.is_valid():
         report = reports.account_ledger(form.cleaned_data['account'], form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner=request.user))
-    return render(request, 'ledger/account_ledger.html', {'form': form, 'report': report})
+    return report_render(request, 'ledger/account_ledger.html', {'form': form, 'report': report})
 
 
 def balance_sheet(request):
     today = timezone.localdate()
-    form = BalanceSheetForm(request.GET if request.GET else {'as_of': today})
+    form = BalanceSheetForm(request.GET if any(key != 'export' for key in request.GET) else {'as_of': today})
     report = reports.balance_sheet(form.cleaned_data['as_of'], vouchers=Voucher.objects.filter(owner=request.user)) if form.is_valid() else None
-    return render(request, 'ledger/balance_sheet.html', {'form': form, 'report': report})
+    return report_render(request, 'ledger/balance_sheet.html', {'form': form, 'report': report})
 
 
 def income_statement(request):
     today = timezone.localdate()
-    form = IncomeStatementForm(request.GET if request.GET else {'start': today.replace(month=1, day=1), 'end': today})
+    form = IncomeStatementForm(request.GET if any(key != 'export' for key in request.GET) else {'start': today.replace(month=1, day=1), 'end': today})
     report = reports.income_statement(form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner=request.user)) if form.is_valid() else None
-    return render(request, 'ledger/income_statement.html', {'form': form, 'report': report})
+    return report_render(request, 'ledger/income_statement.html', {'form': form, 'report': report})
 
 
 @management_required
@@ -155,6 +174,7 @@ def account_new(request):
                 account = form.save(commit=False)
                 account.owner = request.user
                 account.save()
+                request._audit_target = account.pk
         except IntegrityError:
             if not Account.objects.filter(pk=form.cleaned_data['code']).exists():
                 raise
@@ -166,7 +186,7 @@ def account_new(request):
 
 
 def partner_ledger(request):
-    form = PartnerLedgerForm(request.GET if request.GET else None, user=request.user)
+    form = PartnerLedgerForm(request.GET if any(key != 'export' for key in request.GET) else None, user=request.user)
     rows = []
     income = expense = opening = Decimal(0)
     partner_name = None
@@ -200,13 +220,17 @@ def partner_ledger(request):
                 expense += voucher.gross_amount
                 running -= voucher.gross_amount
             rows.append({'voucher': voucher, 'balance': running})
-    return render(request, 'ledger/partner_ledger.html', {
+    return report_render(request, 'ledger/partner_ledger.html', {
         'form': form, 'rows': rows, 'partner_name': partner_name,
         'income': income, 'expense': expense, 'opening': opening,
         'closing': opening + income - expense,
         'balance': income - expense,
         'journal_vouchers': journal_vouchers,
     })
+
+
+def voucher_entry(request):
+    return render(request, 'ledger/voucher_entry.html')
 
 
 def dashboard(request):
@@ -223,7 +247,7 @@ def dashboard(request):
     income, expense = totals['income'] or Decimal(0), totals['expense'] or Decimal(0)
     groups = vouchers.exclude(kind=Voucher.Kind.JOURNAL).order_by().values('kind', 'account', 'account_master_id').annotate(total=Sum('amount')).order_by('kind', '-total', 'account_master_id', 'account')
     journal_groups = JournalLine.objects.filter(voucher__in=vouchers).order_by().values('account_id', 'account__name').annotate(debit=Sum('amount', filter=Q(side='debit')), credit=Sum('amount', filter=Q(side='credit'))).order_by('account_id')
-    return render(request, 'ledger/dashboard.html', {'period': period, 'vouchers': vouchers.prefetch_related('journal_lines__account'), 'groups': groups, 'journal_groups': journal_groups, 'income': income, 'expense': expense, 'balance': income-expense, 'count': vouchers.count()})
+    return report_render(request, 'ledger/dashboard.html', {'period': period, 'vouchers': vouchers.prefetch_related('journal_lines__account'), 'groups': groups, 'journal_groups': journal_groups, 'income': income, 'expense': expense, 'balance': income-expense, 'count': vouchers.count()})
 
 
 @require_http_methods(['GET', 'POST'])
@@ -238,6 +262,7 @@ def edit(request, pk=None, entry_type=Voucher.EntryType.OTHER):
         saved = form.save(commit=False)
         saved.owner = request.user
         saved.save()
+        request._audit_target = str(saved.pk)
         messages.success(request, '전표를 저장했습니다.')
         return redirect('dashboard')
     labels = dict(Voucher.EntryType.choices)
@@ -276,6 +301,7 @@ def journal_edit(request, voucher=None):
                 saved.account_master = None
                 saved.amount = rows.debit_total
                 saved.save()
+                request._audit_target = str(saved.pk)
                 saved.journal_lines.all().delete()
                 lines = []
                 for number, row in enumerate(rows, start=1):

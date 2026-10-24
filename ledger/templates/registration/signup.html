@@ -1,8 +1,8 @@
 {% extends 'ledger/base.html' %}{% block content %}
-<section class="panel auth-panel"><div class="auth-heading"><span class="tag">BPMS 쉬운장부</span><h1>신규 사용자 등록</h1><p class="muted">계정과 업체 정보를 등록하고 쉬운장부를 시작하세요.</p><p class="muted">모든 항목은 필수 입력입니다.</p></div>
-<form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="auth-field"><label for="{{ field.id_for_label }}">{{ field.label }} <span aria-hidden="true">*</span></label>{% if field.name == 'username' %}<div class="username-control">{{ field }}<button type="button" class="secondary" id="check-username" data-url="{% url 'check_username' %}">중복확인</button></div><p id="username-status" class="help-text" role="status" aria-live="polite">아이디를 입력한 뒤 중복확인을 눌러주세요.</p>{% else %}{{ field }}{% endif %}{{ field.errors }}{% if field.help_text %}<div class="help-text">{{ field.help_text }}</div>{% endif %}</div>{% endfor %}<button class="auth-submit" type="submit">사용자 등록</button></form>
+<section class="panel auth-panel"><div class="auth-heading"><span class="tag">BPMS 쉬운장부</span><h1>신규 회원가입</h1><p class="muted">계정 정보를 등록하고 쉬운장부를 시작하세요.</p><p class="muted">모든 항목은 필수 입력입니다.</p></div>
+<form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}{% if system_mode or field.name != 'grade' and field.name != 'company_name' and field.name != 'business_number' and field.name != 'contact_name' and field.name != 'email' and field.name != 'contact_phone' %}<div class="auth-field"><label for="{{ field.id_for_label }}">{{ field.label }} <span aria-hidden="true">*</span></label>{% if field.name == 'username' %}<div class="username-control">{{ field }}<button type="button" class="secondary" id="check-username" data-url="{% url 'check_username' %}">중복확인</button></div><p id="username-status" class="help-text" role="status" aria-live="polite"></p>{% elif field.name == 'password1' or field.name == 'password2' %}{% include 'registration/password_control.html' %}{% else %}{{ field }}{% endif %}{{ field.errors }}{% if field.help_text and field.name != 'username' %}{% if field.name == 'username' or field.name == 'password1' or field.name == 'password2' %}<div class="field-help-popup" id="{{ field.auto_id }}_helptext" role="tooltip">{% if field.name == 'username' %}<p>아이디를 입력한 뒤 중복확인을 눌러주세요.</p>{% endif %}{{ field.help_text }}</div>{% else %}<div class="help-text">{{ field.help_text }}</div>{% endif %}{% endif %}</div>{% endif %}{% endfor %}<button class="auth-submit" type="submit">사용자 등록</button></form>
 {% if system_mode %}<p class="auth-bottom"><a href="{% url 'member_list' %}">회원현황으로 돌아가기</a></p>{% else %}<p class="auth-bottom">이미 계정이 있나요? <a href="{% url 'login' %}">로그인하기</a></p>{% endif %}</section>
-<style>.username-control{display:flex;gap:10px;align-items:stretch}.username-control input{flex:1;min-width:0}.username-control button{flex-shrink:0;white-space:nowrap}.username-control button:disabled{opacity:.6;cursor:wait}.help-text.income{color:var(--green)}.help-text.expense{color:#bd5740}</style>
+<style>.password-control{position:relative}.password-control input{padding-right:48px}.password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:8px;background:transparent;color:var(--muted);line-height:0;border-radius:5px}.password-toggle:focus-visible{outline:2px solid var(--green)}.password-toggle .eye-slash{display:none}.password-toggle[aria-pressed="true"] .eye-slash{display:block}.auth-field{position:relative}.field-help-popup{display:none;position:absolute;top:calc(100% + 6px);left:0;width:100%;padding:14px 16px;border:1px solid #cbd6ce;border-radius:9px;background:#fff;color:var(--ink);font-size:13px;box-shadow:0 6px 24px #18312e26;z-index:30;max-height:240px;overflow:auto}.auth-field:focus-within:not(.help-dismissed):not(.has-password) .field-help-popup{display:block}.field-help-popup p{margin:0 0 8px}.field-help-popup ul{margin:0;padding-left:20px}.username-control{display:flex;gap:10px;align-items:stretch}.username-control input{flex:1;min-width:0}.username-control button{flex-shrink:0;white-space:nowrap}.username-control button:disabled{opacity:.6;cursor:wait}.help-text.income{color:var(--green)}.help-text.expense{color:#bd5740}</style>
 <script>
 (() => {
   const input = document.getElementById('id_username');
@@ -14,6 +14,30 @@
     status.className = 'help-text ' + (ok ? 'income' : 'expense');
   };
   input.setAttribute('aria-describedby', 'username-status');
+  document.querySelectorAll('.password-control').forEach(control => {
+    const password = control.querySelector('input');
+    const toggle = control.querySelector('.password-toggle');
+    const field = control.closest('.auth-field');
+    const updateHelp = () => field.classList.toggle('has-password', password.value.length > 0);
+    password.addEventListener('input', updateHelp);
+    password.addEventListener('change', updateHelp);
+    password.addEventListener('focus', updateHelp);
+    updateHelp();
+    toggle.addEventListener('click', () => {
+      const visible = password.type === 'password';
+      password.type = visible ? 'text' : 'password';
+      toggle.setAttribute('aria-pressed', String(visible));
+      toggle.setAttribute('aria-label', visible ? '비밀번호 숨기기' : '비밀번호 보기');
+      toggle.title = visible ? '비밀번호 숨기기' : '비밀번호 보기';
+      password.focus();
+      updateHelp();
+    });
+  });
+  document.querySelectorAll('.auth-field').forEach(field => {
+    field.addEventListener('focusin', () => field.classList.remove('help-dismissed'));
+    field.addEventListener('keydown', event => {if (event.key === 'Escape') field.classList.add('help-dismissed');});
+  });
+  document.addEventListener('pointerdown', event => {document.querySelectorAll('.auth-field').forEach(field => {if (!field.contains(event.target)) field.classList.add('help-dismissed');});});
   input.addEventListener('input', () => {
     generation++;
     input.setCustomValidity('');

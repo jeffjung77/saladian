@@ -1,0 +1,8 @@
+{% if user.is_staff or user.is_superuser %}
+<button type="button" class="secondary" onclick="window.print()">인쇄</button>
+<a class="btn secondary excel-download" href="?{% for key, value in request.GET.items %}{% if key != 'export' %}{{ key|urlencode }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}export=xlsx" download>Excel 다운로드</a>
+{% load static %}<script src="{% static 'ledger/excel_download.js' %}?v=1" defer></script>
+{% else %}
+<button type="button" class="secondary" onclick="alert('인쇄 기능과 다운로드기능은 서비스 구독사용자만 사용가능합니다. 회원정보 변경하단의 사용등록을 하세요.')">인쇄</button>
+<button type="button" class="secondary" onclick="alert('인쇄 기능과 다운로드기능은 서비스 구독사용자만 사용가능합니다. 회원정보 변경하단의 사용등록을 하세요.')">Excel 다운로드</button>
+{% endif %}

@@ -235,10 +235,10 @@ class JournalRowForm(forms.Form):
                     account = candidate
             if name:
                 if account:
-                    if name not in (account.name, str(account)):
+                    if name not in (account.pk, account.name, str(account)):
                         self.add_error(f'{side}_name', '계정과목명과 선택한 계정이 일치하지 않습니다.')
                 else:
-                    candidates = list(available.filter(name=name)[:2])
+                    candidates = list(available.filter(pk=name)[:1]) or list(available.filter(name=name)[:2])
                     if len(candidates) == 1:
                         account = candidates[0]
                     else:

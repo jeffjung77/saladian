@@ -41,3 +41,13 @@ class JournalAccountSearchTests(AuthenticatedLedgerTestCase):
         response = self.client.post(reverse('voucher_new'), self.data(**{'lines-0-debit_code': '1101', 'lines-0-credit_code': '5001'}))
         self.assertIn('debit_code', response.context['rows'].forms[0].errors)
         self.assertFalse(Voucher.objects.exists())
+
+    def test_codes_in_name_fields_resolve_on_both_sides(self):
+        data = self.data(**{'lines-0-debit_name': '1101', 'lines-0-credit_name': '5001'})
+        self.assertEqual(self.client.post(reverse('voucher_new'), data).status_code, 302)
+        self.assertEqual(set(Voucher.objects.get().journal_lines.values_list('account_id', flat=True)), {'1101', '5001'})
+
+    def test_credit_code_in_name_field_with_selected_account(self):
+        data = self.data(**{'lines-0-debit_code': '1101', 'lines-0-credit_name': '5001',
+                           'lines-0-credit_code': '5001', 'lines-0-credit_account': '5001'})
+        self.assertEqual(self.client.post(reverse('voucher_new'), data).status_code, 302)

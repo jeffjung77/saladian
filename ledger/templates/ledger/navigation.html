@@ -3,12 +3,13 @@
 </style>
 {% if user.is_authenticated %}
 <div class="main-menu" aria-label="주 메뉴">
+<a href="{% url 'voucher_entry' %}" class="btn secondary">전표입력</a>
 <a href="{% url 'business_overview' %}" class="btn secondary">사업현황</a>
-<a href="{% url 'dashboard' %}" class="btn secondary">전표 · 집계</a>
 <details class="nav-group"><summary>보고서</summary><div class="nav-dropdown">
-<a href="{% url 'balance_sheet' %}">대차대조표</a>
 <a href="{% url 'income_statement' %}">손익계산서</a>
-<a href="{% url 'account_ledger' %}">계정별원장</a>
+<a href="{% url 'balance_sheet' %}">대차대조표</a>
+<a href="{% url 'dashboard' %}">전표집계</a>
+<a href="{% url 'account_ledger' %}">계정별 원장</a>
 <a href="{% url 'partner_ledger' %}">거래처별 원장</a>
 </div></details>
 {% if user.is_staff or user.is_superuser %}<details class="nav-group"><summary>관리</summary><div class="nav-dropdown">
@@ -16,11 +17,14 @@
 <a href="{% url 'accounts' %}">계정과목표</a>
 </div></details>
 {% endif %}{% if user.is_superuser %}<details class="nav-group"><summary>시스템관리</summary><div class="nav-dropdown">
-<a href="{% url 'system_signup' %}">신규회원가입</a>
 <a href="{% url 'member_list' %}">회원현황</a>
+<a href="{% url 'subscription_list' %}">구독관리</a>
+<a href="{% url 'company_list' %}">업체관리</a>
+<a href="{% url 'audit_logs' %}">로그조회</a>
 </div></details>
 {% endif %}
 <span class="muted nav-user">{{ user.username }}</span>
+<a href="{% url 'member_profile' %}" class="btn secondary">회원정보 변경</a>
 <form class="nav-logout" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="secondary" type="submit">로그아웃</button></form>
 </div>
 <script>
@@ -35,4 +39,4 @@
  });
 })();
 </script>
-{% else %}<a class="btn secondary" href="{% url 'login' %}">로그인</a>{% endif %}
+{% else %}<div class="main-menu">{% if guest_preview %}<a class="btn secondary" href="{% url 'dashboard' %}">전표 · 집계</a><a class="btn secondary" href="{% url 'balance_sheet' %}">보고서</a>{% endif %}<a class="btn secondary" href="{% url 'login' %}">로그인</a></div>{% endif %}

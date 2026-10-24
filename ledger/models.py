@@ -34,11 +34,48 @@ class BusinessProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='business_profile', on_delete=models.CASCADE)
     company_name = models.CharField('업체명', max_length=150)
     business_number = models.CharField('사업자등록번호', max_length=12)
+    business_address = models.CharField('사업등록주소', max_length=250, blank=True)
+    business_phone = models.CharField('사업자 전화번호', max_length=30, blank=True)
     contact_name = models.CharField('담당자', max_length=100)
     contact_phone = models.CharField('담당자 연락처', max_length=30)
 
     def __str__(self):
         return self.company_name
+
+
+class AuditLog(models.Model):
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='audit_actions')
+    actor_name = models.CharField('사용자', max_length=150, blank=True)
+    company_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='company_audit_logs')
+    company_name = models.CharField('업체명', max_length=150, blank=True)
+    action = models.CharField('작업', max_length=20)
+    resource = models.CharField('기능', max_length=60)
+    target = models.CharField('대상 번호', max_length=150, blank=True)
+    method = models.CharField('요청 방식', max_length=8)
+    status_code = models.PositiveSmallIntegerField('응답 코드')
+    result = models.CharField('결과', max_length=20)
+    path = models.CharField('경로', max_length=300)
+    occurred_at = models.DateTimeField('발생 시각', auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-occurred_at', '-pk']
+        indexes = [models.Index(fields=['company_user', 'occurred_at']), models.Index(fields=['actor', 'occurred_at'])]
+
+
+class Subscription(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='subscription', on_delete=models.CASCADE)
+    company_name = models.CharField('업체명', max_length=150)
+    business_number = models.CharField('사업자등록번호', max_length=12)
+    business_address = models.CharField('사업등록주소', max_length=250)
+    business_phone = models.CharField('사업자 전화번호', max_length=30)
+    email = models.EmailField('이메일')
+    contact_name = models.CharField('담당자', max_length=100)
+    contact_phone = models.CharField('담당자 전화번호', max_length=30)
+    registered_at = models.DateTimeField('사용등록일', auto_now_add=True)
+    updated_at = models.DateTimeField('수정일', auto_now=True)
+
+    class Meta:
+        ordering = ['-registered_at', '-pk']
 
 
 def certificate_upload_path(instance, filename):

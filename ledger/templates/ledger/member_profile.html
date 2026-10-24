@@ -1,0 +1,13 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><div><h1>회원정보 변경</h1><p class="muted">회원아이디를 확인하고 비밀번호를 변경하세요.</p></div></div>
+<section class="panel form-panel">
+<label for="profile-username">회원아이디</label><input id="profile-username" value="{{ user.username }}" readonly>
+<h2 style="margin-top:24px">비밀번호 변경</h2>
+<form method="post">{% csrf_token %}{{ form.non_field_errors }}
+{% for field in form %}<div class="auth-field"><label for="{{ field.id_for_label }}">{{ field.label }} *</label>{% include 'registration/password_control.html' %}{{ field.errors }}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}</div>{% endfor %}
+<button type="submit">비밀번호 변경 저장</button> <a class="btn secondary" href="{% url 'voucher_entry' %}">다음에 변경하기</a></form>
+<div style="margin-top:28px;border-top:1px solid var(--line);padding-top:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap"><a class="btn secondary" href="{% url 'member_registration' %}">사용등록</a><span class="muted">클라우드형 정규 서비스 사용을 위해서는 사용등록 후 사용하세요.</span></div>
+</section>
+<style>.password-control{position:relative}.password-control input{padding-right:48px}.password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:8px;background:transparent;color:var(--muted);line-height:0}.password-toggle .eye-slash{display:none}.password-toggle[aria-pressed="true"] .eye-slash{display:block}.password-toggle:focus-visible{outline:2px solid var(--green)}</style>
+<script>document.querySelectorAll('.password-control').forEach(control=>{const input=control.querySelector('input'),button=control.querySelector('button');button.addEventListener('click',()=>{const visible=input.type==='password';input.type=visible?'text':'password';button.setAttribute('aria-pressed',String(visible));button.setAttribute('aria-label',visible?'비밀번호 숨기기':'비밀번호 보기');button.title=visible?'비밀번호 숨기기':'비밀번호 보기';input.focus();});});</script>
+{% endblock %}

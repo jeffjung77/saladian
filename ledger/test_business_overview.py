@@ -2,6 +2,7 @@ from datetime import date
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.test import override_settings
 from django.urls import reverse
 from .models import Voucher, JournalLine
 from .reports import balance_sheet, income_statement
@@ -9,6 +10,25 @@ from .test_helpers import AuthenticatedLedgerTestCase
 
 
 class BusinessOverviewTests(AuthenticatedLedgerTestCase):
+    @override_settings(DEBUG=True)
+    def test_development_guest_preview_and_protected_features(self):
+        self.simple('2026-10-23', '5001', 1234567, 'income')
+        guest = Client()
+        response = guest.get('/')
+        self.assertContains(response, '로그인 전 미리보기')
+        self.assertEqual(response.context['cash_total'], 0)
+        self.assertNotContains(response, '1,234,567')
+        for name in ['dashboard', 'sales_new', 'voucher_new', 'balance_sheet', 'income_statement', 'account_ledger']:
+            response = guest.get(reverse(name))
+            self.assertEqual(response.status_code, 302)
+            self.assertIn(reverse('login') + '?next=', response.url)
+
+    @override_settings(DEBUG=False)
+    def test_production_guest_still_requires_login(self):
+        response = Client().get('/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login'), response.url)
+
     def simple(self, when, code, amount, kind, **kwargs):
         return Voucher.objects.create(owner=self.user, date=when, kind=kind, account=code,
                                       account_master_id=code, settlement_account_id='1101', amount=amount, **kwargs)

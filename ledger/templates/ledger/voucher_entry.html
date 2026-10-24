@@ -1,0 +1,10 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><div><h1>전표입력</h1><p class="muted">입력할 전표 종류를 선택하세요.</p></div></div>
+<div class="cards">
+<section class="card"><h2>매출입력</h2><p class="muted">매출 거래와 공급가액·부가세를 입력합니다.</p><a class="btn" href="{% url 'sales_new' %}">매출전표 생성</a></section>
+<section class="card"><h2>비용입력</h2><p class="muted">비용 거래와 공급가액·부가세를 입력합니다.</p><a class="btn" href="{% url 'expense_new' %}">비용전표 생성</a></section>
+<section class="card"><h2>기타전표</h2><p class="muted">차변·대변 계정과 금액을 직접 입력합니다.</p><a class="btn" href="{% url 'voucher_new' %}">기타전표 생성</a></section>
+</div>
+{% endblock %}
+
+{% block footer %}{% endblock %}

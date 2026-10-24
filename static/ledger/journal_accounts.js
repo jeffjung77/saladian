@@ -24,9 +24,9 @@
       name.addEventListener('input', () => {
         const query = name.value.trim().toLocaleLowerCase();
         code.value = ''; select.value = '';
-        const matches = options.filter(option => accountName(option).toLocaleLowerCase().includes(query));
+        const matches = options.filter(option => option.value.includes(query) || accountName(option).toLocaleLowerCase().includes(query));
         options.forEach(option => {option.hidden = !!query && !matches.includes(option);});
-        const exact = matches.filter(option => accountName(option).toLocaleLowerCase() === query);
+        const exact = matches.filter(option => option.value === query || accountName(option).toLocaleLowerCase() === query);
         if (exact.length === 1) {
           select.value = exact[0].value; code.value = exact[0].value;
         }

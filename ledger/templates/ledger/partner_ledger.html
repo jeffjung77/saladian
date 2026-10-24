@@ -1,5 +1,6 @@
 {% extends 'ledger/base.html' %}{% load humanize %}{% block content %}
 <div class="heading"><div><h1>거래처별 원장</h1><p class="muted">거래처의 수입·지출 내역을 날짜순으로 확인하세요.</p></div><a class="btn secondary" href="{% url 'dashboard' %}">전체 전표</a></div>
+<div class="panel filter report-controls">{% include 'ledger/report_actions.html' %}</div>
 <section class="panel"><form method="get" class="filter"><div><label for="{{ form.partner.id_for_label }}">거래처</label>{{ form.partner }}{{ form.partner.errors }}</div><div><label for="{{ form.start.id_for_label }}">시작일</label>{{ form.start }}{{ form.start.errors }}</div><div><label for="{{ form.end.id_for_label }}">종료일</label>{{ form.end }}{{ form.end.errors }}</div><button>원장 조회</button><a class="btn secondary" href="{% url 'partner_ledger' %}">초기화</a></form>{{ form.non_field_errors }}<p class="muted">기간을 비워두면 전체 기간을 조회합니다. 등록된 거래처의 고유 정보로 조회하며 이름을 수정해도 연결은 유지됩니다.</p></section>
 {% if partner_name %}
 <h2>{{ partner_name }} <span class="muted">· {{ rows|length }}건</span></h2>

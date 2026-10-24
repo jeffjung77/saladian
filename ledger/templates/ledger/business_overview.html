@@ -8,7 +8,7 @@
 <div class="card"><span class="muted">이번 달 순이익</span><strong class="{% if income.net_profit < 0 %}expense{% else %}income{% endif %}">{{ income.net_profit|intcomma }}원</strong></div>
 <div class="card"><span class="muted">현재 자산총계</span><strong>{{ balance.assets|intcomma }}원</strong></div>
 </div>
-{% if not balance.included_count %}<div class="notice">집계할 전표가 없습니다. 전표를 입력하면 그래프와 재무상태가 표시됩니다.</div>{% endif %}
+{% if guest_preview %}<div class="notice">로그인 전 미리보기입니다. 표시된 0원은 예시이며, 로그인하면 본인의 장부가 표시됩니다. 메뉴나 매출입력을 클릭하면 로그인 화면으로 이동합니다.</div>{% elif not balance.included_count %}<div class="notice">집계할 전표가 없습니다. 전표를 입력하면 그래프와 재무상태가 표시됩니다.</div>{% endif %}
 {% if balance.excluded %}<div class="notice">분개 정보 확인이 필요한 전표 {{ balance.excluded|length }}건은 집계에서 제외했습니다. <a href="{% url 'balance_sheet' %}?as_of={{ today|date:'Y-m-d' }}">대차대조표에서 확인하기</a></div>{% endif %}
 <div class="overview-grid">
 <section class="panel"><h2>현금계정 합계잔액 그래프</h2><p class="muted">{{ start|date:'m월 d일' }} ~ {{ today|date:'m월 d일' }} · 일별 마감잔액</p>

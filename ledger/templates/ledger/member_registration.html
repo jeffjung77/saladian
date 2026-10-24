@@ -1,0 +1,8 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><div><h1>사용등록</h1><p class="muted">업체 정보와 연락처를 입력하거나 수정하세요. 모든 입력 항목은 필수입니다.</p></div></div>
+<form method="post" class="panel form-panel">{% csrf_token %}{{ form.non_field_errors }}
+<p><strong>회원아이디:</strong> {{ user.username }}</p>
+<div class="form-grid">{% for field in form %}<div {% if field.name == 'business_address' %}class="wide"{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }} *</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div>
+<p class="muted">업체명을 저장하면 상단 업체명 표시에도 반영됩니다.</p>
+<button type="submit">사용등록 저장</button> <a class="btn secondary" href="{% url 'member_profile' %}">회원정보 변경으로 돌아가기</a>
+</form>{% endblock %}
