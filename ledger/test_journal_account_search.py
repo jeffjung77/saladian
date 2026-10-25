@@ -19,9 +19,19 @@ class JournalAccountSearchTests(AuthenticatedLedgerTestCase):
         self.assertEqual(set(voucher.journal_lines.values_list('account_id', flat=True)), {'1101', '5001'})
         response = self.client.get(reverse('voucher_edit', args=[voucher.pk]))
         self.assertContains(response, 'value="1101"')
-        self.assertContains(response, 'value="현금"')
+        self.assertContains(response, 'value="1101 · 현금"')
         self.assertContains(response, 'lines-4-credit_code')
-        self.assertContains(response, 'lines-4-debit_name')
+        self.assertContains(response, 'lines-4-debit_account')
+
+    def test_direct_account_entry_fields_on_both_sides(self):
+        data = self.data(**{'lines-0-debit_account': '현금', 'lines-0-credit_account': '5001'})
+        self.assertEqual(self.client.post(reverse('voucher_new'), data).status_code, 302)
+        voucher = Voucher.objects.get()
+        self.assertEqual(set(voucher.journal_lines.values_list('account_id', flat=True)), {'1101', '5001'})
+        response = self.client.get(reverse('voucher_new'))
+        self.assertNotContains(response, '<select name="lines-0-debit_account"')
+        self.assertNotContains(response, '<select name="lines-0-credit_account"')
+        self.assertContains(response, 'list="lines-0-debit-suggestions"')
 
     def test_unknown_ambiguous_and_mismatched_inputs_are_rejected(self):
         variants = [({'lines-0-debit_code': '9999'}, 'debit_code'),

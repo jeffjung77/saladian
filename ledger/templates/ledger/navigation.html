@@ -26,6 +26,7 @@
 <span class="muted nav-user">{{ user.username }}</span>
 <a href="{% url 'member_profile' %}" class="btn secondary">회원정보 변경</a>
 <form class="nav-logout" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="secondary" type="submit">로그아웃</button></form>
+<a href="{% url 'board_list' %}" class="btn secondary">게시판</a>
 </div>
 <script>
 (() => {

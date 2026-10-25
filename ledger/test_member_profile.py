@@ -39,6 +39,7 @@ class MemberProfileTests(AuthenticatedLedgerTestCase):
         self.assertEqual(self.client.get(url).status_code, 200)
         self.assertFalse(BusinessProfile.objects.filter(user=self.user).exists())
         data = {'company_name': '내 업체', 'business_number': '1234567890', 'contact_name': '담당자',
+                'business_type': '서비스업', 'business_category': '컨설팅',
                 'contact_phone': '010-1234-5678', 'email': 'me@example.test', 'business_address': '서울시 송파구', 'business_phone': '02-1234-5678', 'user': other.pk, 'is_superuser': 'on', 'username': 'forged'}
         self.assertRedirects(self.client.post(url, data), url)
         self.user.refresh_from_db()
@@ -61,5 +62,5 @@ class MemberProfileTests(AuthenticatedLedgerTestCase):
             response = self.client.post(url, {field: value})
             self.assertIn(field, response.context['form'].errors)
         response = self.client.post(url, {})
-        self.assertEqual(set(response.context['form'].errors), {'company_name', 'business_number', 'business_address', 'business_phone', 'email', 'contact_name', 'contact_phone'})
+        self.assertEqual(set(response.context['form'].errors), {'company_name', 'business_number', 'business_type', 'business_category', 'business_address', 'business_phone', 'email', 'contact_name', 'contact_phone'})
         self.assertTrue(all(field.required for field in response.context['form'].fields.values()))

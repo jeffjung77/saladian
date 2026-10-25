@@ -6,6 +6,88 @@ from django.conf import settings
 from .vat import VAT_CHOICES, TRADE_CHOICES, DOCUMENT_CHOICES, DEDUCTION_CHOICES
 
 
+def receipt_photo_path(instance, filename):
+    return f'receipts/{instance.owner_id}/{uuid4().hex}'
+
+
+class ReceiptPhoto(models.Model):
+    class Status(models.TextChoices):
+        PROCESSING = 'processing', '인식 중'
+        REVIEW = 'review', '확인 대기'
+        COMPLETED = 'completed', '전표 생성 완료'
+        FAILED = 'failed', '인식 실패'
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='receipt_photos')
+    photo = models.FileField('영수증 사진', upload_to=receipt_photo_path)
+    image_type = models.CharField(max_length=30)
+    original_name = models.CharField('파일명', max_length=255)
+    status = models.CharField('처리 상태', max_length=20, choices=Status.choices, default=Status.REVIEW)
+    created_at = models.DateTimeField('업로드 일시', auto_now_add=True)
+    ocr_text = models.TextField('인식한 글자', blank=True)
+    ocr_error = models.CharField('인식 오류', max_length=300, blank=True)
+    ocr_started_at = models.DateTimeField(null=True, blank=True)
+    analyzed_at = models.DateTimeField('분석 완료 일시', null=True, blank=True)
+    voucher = models.OneToOneField('Voucher', on_delete=models.SET_NULL, null=True, blank=True, related_name='receipt_photo')
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+
+
+class VisionUsage(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='vision_usage')
+    receipt = models.ForeignKey(ReceiptPhoto, on_delete=models.SET_NULL, null=True, related_name='vision_usage')
+    company_name = models.CharField('요청 당시 업체명', max_length=150, blank=True)
+    requested_at = models.DateTimeField('요청 일시', auto_now_add=True, db_index=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    result = models.CharField(max_length=10, choices=[('pending', '처리 중'), ('success', '성공'), ('failed', '실패')], default='pending')
+    api_attempted = models.BooleanField('API 호출 시도', default=False)
+    is_retry = models.BooleanField('재분석', default=False)
+
+    class Meta:
+        ordering = ['-requested_at', '-pk']
+
+
+class ReceiptCreationUsage(models.Model):
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='receipt_creation_usage')
+    generated_count = models.PositiveIntegerField('사진 비용전표 누적 생성 횟수', default=0)
+
+
+class BoardPost(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='board_posts')
+    title = models.CharField('제목', max_length=200)
+    body = models.TextField('내용', max_length=10000)
+    created_at = models.DateTimeField('작성일', auto_now_add=True)
+    updated_at = models.DateTimeField('수정일', auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+
+    def __str__(self):
+        return self.title
+
+
+class BoardComment(models.Model):
+    post = models.ForeignKey(BoardPost, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='board_comments')
+    body = models.TextField('댓글', max_length=2000)
+    created_at = models.DateTimeField('작성일', auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+
+
+def board_attachment_path(instance, filename):
+    return f'board/{instance.post_id}/{uuid4().hex}'
+
+
+class BoardAttachment(models.Model):
+    post = models.ForeignKey(BoardPost, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField('파일', upload_to=board_attachment_path)
+    original_name = models.CharField('파일명', max_length=255)
+    size = models.PositiveIntegerField('크기')
+    image_type = models.CharField('이미지 형식', max_length=20, blank=True)
+
+
 class Account(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='custom_accounts')
     code = models.CharField('계정코드', max_length=4, primary_key=True)
@@ -66,7 +148,9 @@ class Subscription(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='subscription', on_delete=models.CASCADE)
     company_name = models.CharField('업체명', max_length=150)
     business_number = models.CharField('사업자등록번호', max_length=12)
-    business_address = models.CharField('사업등록주소', max_length=250)
+    business_type = models.CharField('업태', max_length=100, default='')
+    business_category = models.CharField('업종', max_length=100, default='')
+    business_address = models.CharField('사업자등록상 주소', max_length=250)
     business_phone = models.CharField('사업자 전화번호', max_length=30)
     email = models.EmailField('이메일')
     contact_name = models.CharField('담당자', max_length=100)
@@ -179,6 +263,23 @@ class Voucher(models.Model):
         constraints = [models.CheckConstraint(condition=models.Q(amount__gt=0), name='voucher_amount_positive')]
 
 # Create your models here.
+
+
+class JournalRowVAT(models.Model):
+    voucher = models.ForeignKey(Voucher, related_name='row_vat', on_delete=models.CASCADE)
+    row = models.PositiveSmallIntegerField('행 번호')
+    vat_code = models.CharField('부가세 코드', max_length=3, choices=VAT_CHOICES, blank=True)
+    vat_trade = models.CharField('부가세 매출·매입', max_length=1, choices=TRADE_CHOICES, blank=True)
+    vat_document = models.CharField('증빙 종류', max_length=3, choices=DOCUMENT_CHOICES, blank=True)
+    vat_deduction = models.CharField('매입세액 공제 구분', max_length=3, choices=DEDUCTION_CHOICES, blank=True)
+    vat_amount = models.DecimalField('부가세 금액(원)', max_digits=14, decimal_places=0, default=0, validators=[MinValueValidator(0)])
+    vat_deductible = models.DecimalField('공통매입 중 공제할 세액(원)', max_digits=14, decimal_places=0, default=0, validators=[MinValueValidator(0)])
+    vat_reason = models.CharField('불공제·안분 사유 / 검토 메모', max_length=300, blank=True)
+
+    class Meta:
+        ordering = ['row']
+        constraints = [models.UniqueConstraint(fields=['voucher', 'row'], name='journal_vat_unique_row'),
+            models.CheckConstraint(condition=models.Q(row__gte=1, row__lte=5), name='journal_vat_five_rows')]
 
 
 class JournalLine(models.Model):

@@ -1,0 +1,8 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><div><h1>영수증 분석 결과</h1><p class="muted">{{ item.original_name }} · {{ item.get_status_display }}</p></div><a class="btn secondary" href="{% url 'receipt_history' %}">처리 내역</a></div>
+<section class="panel">{% include 'ledger/receipt_analyze_button.html' %}
+{% if item.ocr_error %}<p class="errorlist">{{ item.ocr_error }}</p>{% endif %}
+<p class="muted">원본과 인식 결과를 확인한 뒤 비용전표 초안을 작성하세요.</p>
+{% if item.voucher_id %}<div class="notice">생성된 비용전표 #{{ item.voucher_id }} <a class="btn" style="background:#24843b;color:#fff;margin-left:10px" href="{% url 'voucher_edit' item.voucher_id %}">전표 확인·수정</a></div>{% elif item.status == 'review' and item.ocr_text %}<p><a class="btn" href="{% url 'receipt_expense' item.pk %}">비용전표 초안 작성</a></p>{% endif %}
+<div class="form-grid"><div><h2>원본 영수증</h2>{% include 'ledger/receipt_image.html' %}</div><div><h2>인식한 글자</h2>{% if item.analyzed_at %}<p class="muted">최근 분석 완료: {{ item.analyzed_at|date:'Y-m-d H:i:s' }}</p>{% endif %}{% if item.ocr_text %}<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit">{{ item.ocr_text }}</pre>{% elif item.status == 'processing' %}<p>분석 중입니다. 잠시 후 새로고침해 주세요.</p>{% else %}<p>‘영수증 분석’을 눌러 글자를 인식하세요.</p>{% endif %}</div></div></section>
+{% endblock %}

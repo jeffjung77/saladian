@@ -1,0 +1,24 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><div><h1>영수증 처리 내역</h1><p class="muted">본인이 업로드한 영수증 사진을 확인합니다.</p></div><a class="btn" href="{% url 'receipt_home' %}">영수증 촬영·사진 선택</a></div>
+<section class="panel"><form method="get" class="filter"><div><label for="receipt-status">처리 상태</label><select id="receipt-status" name="status"><option value="">전체</option>{% for key,label in statuses %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div><button>조회</button>{% if receipt_limited %}<span class="badge" role="status">자동 비용전표 생성 남은 횟수 <strong>{{ receipt_remaining }}/10</strong></span>{% else %}<span class="badge">자동 비용전표 생성 횟수 제한 없음</span>{% endif %}</form></section>
+<section class="panel"><p class="muted">분석 버튼을 누르면 사진을 Google Vision으로 전송합니다.</p><div class="table-wrap"><table class="receipt-history-table"><colgroup><col style="width:165px"><col style="width:330px"><col style="width:100px"><col style="width:360px"><col style="width:160px"></colgroup><thead><tr><th>업로드 일시</th><th>사진</th><th>처리 상태</th><th>분석</th><th>비용전표</th></tr></thead><tbody>{% for item in page %}<tr><td>{{ item.created_at|date:'Y-m-d H:i:s' }}</td><td><a href="{% url 'receipt_photo' item.pk %}" target="_blank" rel="noopener">{{ item.original_name }}</a></td><td>{{ item.get_status_display }}</td><td><div class="receipt-row-actions">{% include 'ledger/receipt_analyze_button.html' %}{% if item.status == 'review' and item.ocr_text %}<a class="btn secondary receipt-draft-button" href="{% url 'receipt_expense' item.pk %}">비용전표 초안</a>{% endif %}<a class="btn receipt-result-button" href="{% url 'receipt_detail' item.pk %}">결과 보기</a></div></td><td>{% if item.voucher_id %}<a class="btn receipt-voucher-button" href="{% url 'voucher_edit' item.voucher_id %}">비용전표 #{{ item.voucher_id }}</a>{% else %}<span class="muted">&mdash;</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="5">처리 내역이 없습니다.</td></tr>{% endfor %}</tbody></table></div>
+{% if page.has_other_pages %}<nav aria-label="영수증 처리 내역 페이지" class="filter" style="margin-top:16px">
+{% if page.has_previous %}<a class="btn secondary" href="?status={{ status|urlencode }}&amp;page={{ page.previous_page_number }}">이전</a>{% endif %}
+{% for number in page_numbers %}{% if number == page.paginator.ELLIPSIS %}<span>{{ number }}</span>{% elif number == page.number %}<span class="btn" aria-current="page">{{ number }}</span>{% else %}<a class="btn secondary" href="?status={{ status|urlencode }}&amp;page={{ number }}">{{ number }}</a>{% endif %}{% endfor %}
+{% if page.has_next %}<a class="btn secondary" href="?status={{ status|urlencode }}&amp;page={{ page.next_page_number }}">다음</a>{% endif %}
+<span class="muted">{{ page.start_index }}–{{ page.end_index }} / {{ page.paginator.count }}건</span></nav>{% endif %}</section>
+<style>
+.receipt-history-table{width:1115px;max-width:100%;table-layout:fixed}
+.receipt-history-table th,.receipt-history-table td{padding:10px 8px;vertical-align:middle}
+.receipt-history-table td:nth-child(2){white-space:normal;overflow-wrap:anywhere}
+.receipt-row-actions{display:grid;grid-template-columns:106px 120px 92px;align-items:center;gap:6px;white-space:nowrap}
+.receipt-row-actions>a{text-align:center}
+.receipt-row-actions .receipt-draft-button{grid-column:2}
+.receipt-row-actions .receipt-result-button{grid-column:3}
+.receipt-row-actions button{background:#d4af37;color:#18312e}
+.receipt-row-actions .receipt-result-button{background:#ffeb3b;color:#18312e}
+.receipt-voucher-button{background:#24843b;color:#fff;padding:9px 12px;white-space:nowrap}
+.receipt-row-actions form{margin:0}
+.receipt-row-actions .btn,.receipt-row-actions button{padding:9px 12px}
+@media(max-width:1000px){.receipt-history-table{max-width:none}}
+</style>{% endblock %}

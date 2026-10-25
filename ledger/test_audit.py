@@ -53,7 +53,9 @@ class AuditTests(AuthenticatedLedgerTestCase):
         item = self.subscription()
         admin = get_user_model().objects.create_user(username='audit-admin', is_staff=True, is_superuser=True)
         self.client.force_login(admin)
-        data = {name: getattr(item, name) for name in ['company_name', 'business_number', 'business_address', 'business_phone', 'email', 'contact_name', 'contact_phone']}
+        item.business_type = 'Service'
+        item.business_category = 'Consulting'
+        data = {name: getattr(item, name) for name in ['company_name', 'business_number', 'business_type', 'business_category', 'business_address', 'business_phone', 'email', 'contact_name', 'contact_phone']}
         self.client.post(reverse('subscription_edit', args=[item.pk]), data)
         event = AuditLog.objects.filter(action='update', resource='구독정보').get()
         self.assertEqual(event.actor_id, admin.pk)

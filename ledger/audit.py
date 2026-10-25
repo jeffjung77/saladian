@@ -20,8 +20,11 @@ RESOURCES = {
     'balance_sheet': '대차대조표', 'income_statement': '손익계산서', 'account_ledger': '계정별원장',
     'partner_ledger': '거래처별원장', 'audit_logs': '로그조회',
     'company_list': '업체관리', 'company_detail': '업체현황 조회',
+    'board_list': '게시판', 'board_detail': '게시글 조회', 'board_new': '게시글',
+    'board_edit': '게시글', 'board_delete': '게시글',
+    'board_comment_new': '게시판 댓글', 'board_comment_delete': '게시판 댓글',
 }
-CREATE_VIEWS = {'signup', 'system_signup', 'sales_new', 'expense_new', 'voucher_new', 'counterparty_new', 'account_new'}
+CREATE_VIEWS = {'signup', 'system_signup', 'sales_new', 'expense_new', 'voucher_new', 'counterparty_new', 'account_new', 'board_new', 'board_comment_new'}
 
 
 def company_name(user):

@@ -1,8 +1,9 @@
+from .account_fields import AccountEntryField
 from django import forms
 from decimal import Decimal
 from .models import Voucher, Account, Counterparty
 import re
-from .vat import VAT_FIELDS
+from .vat import VAT_FIELDS, VAT_CHOICES, TRADE_CHOICES, DOCUMENT_CHOICES, DEDUCTION_CHOICES
 from .widgets import MoneyInput
 from .account_settings import visible_accounts, selectable_accounts, CATEGORIES
 
@@ -187,10 +188,10 @@ class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
         }
 
 
-class JournalHeaderForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
+class JournalHeaderForm(CounterpartySelectionMixin, forms.ModelForm):
     class Meta:
         model = Voucher
-        fields = ['date', 'counterparty'] + VAT_FIELDS + ['memo', 'is_closing']
+        fields = ['date', 'counterparty', 'memo', 'is_closing']
         help_texts = {'is_closing': '수익·비용을 이익잉여금으로 대체하는 결산전표에만 선택하세요. 대차대조표에는 반영하고 손익계산서에서는 제외합니다.'}
         widgets = {
             'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
@@ -198,12 +199,29 @@ class JournalHeaderForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelFor
         }
 
 
-class JournalRowForm(forms.Form):
+class JournalRowForm(VatFormMixin, forms.Form):
+    vat_enabled = forms.BooleanField(label='부가세 입력?', required=False,
+        widget=forms.CheckboxInput(attrs={'aria-label': '부가세 입력 여부'}))
+    vat_code = forms.ChoiceField(label='부가세 코드', choices=[('', '선택 안 함')] + VAT_CHOICES, required=False)
+    vat_trade = forms.ChoiceField(label='부가세 매출·매입', choices=[('', '선택 안 함')] + TRADE_CHOICES, required=False)
+    vat_document = forms.ChoiceField(label='증빙 종류', choices=[('', '선택 안 함')] + DOCUMENT_CHOICES, required=False)
+    vat_deduction = forms.ChoiceField(label='매입세액 공제 구분', choices=[('', '선택 안 함')] + DEDUCTION_CHOICES, required=False)
+    vat_amount = forms.DecimalField(label='부가세 금액(원)', required=False, min_value=0, max_digits=14, decimal_places=0)
+    vat_deductible = forms.DecimalField(label='공통매입 중 공제할 세액(원)', required=False, min_value=0, max_digits=14, decimal_places=0)
+    vat_reason = forms.CharField(label='불공제·안분 사유 / 검토 메모', max_length=300, required=False)
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.is_bound:
+            self.initial['vat_enabled'] = any(self.initial.get(name) for name in VAT_FIELDS)
+        elif not self.fields['vat_enabled'].to_python(self.data.get(self.add_prefix('vat_enabled'))):
+            # Hidden unchecked inputs must not persist stale or forged tax data.
+            for field in VAT_FIELDS:
+                self.fields[field].disabled = True
+                self.initial[field] = 0 if field in ('vat_amount', 'vat_deductible') else ''
         for side in ('debit', 'credit'):
             name = f'{side}_account'
             self.fields[name].queryset = selectable_accounts(user, [self.initial.get(name)])
+            self.fields[name].widget.attrs['list'] = f'{self.prefix}-{side}-suggestions'
             if not self.is_bound and self.initial.get(name):
                 account = self.fields[name].queryset.filter(pk=self.initial[name]).first()
                 if account:
@@ -213,14 +231,16 @@ class JournalRowForm(forms.Form):
     debit_name = forms.CharField(label='차변 계정과목명 검색', max_length=100, required=False, widget=forms.TextInput(attrs={'placeholder': '계정과목명 직접 입력', 'autocomplete': 'off'}))
     credit_code = forms.CharField(label='대변 계정코드', max_length=4, required=False, widget=forms.TextInput(attrs={'inputmode': 'numeric', 'placeholder': '계정코드'}))
     credit_name = forms.CharField(label='대변 계정과목명 검색', max_length=100, required=False, widget=forms.TextInput(attrs={'placeholder': '계정과목명 직접 입력', 'autocomplete': 'off'}))
-    debit_account = forms.ModelChoiceField(label='차변 계정과목', queryset=Account.objects.all(), required=False, empty_label='계정과목 선택')
+    debit_account = AccountEntryField(label='차변 계정과목', queryset=Account.objects.all(), required=False, widget=forms.TextInput(attrs={'autocomplete': 'off', 'placeholder': '계정코드 또는 계정과목명 직접 입력'}))
     debit_amount = forms.DecimalField(label='차변 금액', required=False, min_value=1, max_digits=14, decimal_places=0, widget=MoneyInput(attrs={'min': 1, 'step': 1}))
-    credit_account = forms.ModelChoiceField(label='대변 계정과목', queryset=Account.objects.all(), required=False, empty_label='계정과목 선택')
+    credit_account = AccountEntryField(label='대변 계정과목', queryset=Account.objects.all(), required=False, widget=forms.TextInput(attrs={'autocomplete': 'off', 'placeholder': '계정코드 또는 계정과목명 직접 입력'}))
     credit_amount = forms.DecimalField(label='대변 금액', required=False, min_value=1, max_digits=14, decimal_places=0, widget=MoneyInput(attrs={'min': 1, 'step': 1}))
     memo = forms.CharField(label='라인 적요', required=False, max_length=1000, widget=forms.TextInput(attrs={'placeholder': '이 행의 공통 거래 내용 (선택)'}))
 
     def clean(self):
         data = super().clean()
+        if data.get('vat_enabled') and not data.get('vat_code'):
+            self.add_error('vat_code', '부가세 코드를 선택하세요.')
         for side in ['debit', 'credit']:
             account, amount = data.get(f'{side}_account'), data.get(f'{side}_amount')
             code, name = data.get(f'{side}_code'), data.get(f'{side}_name')
@@ -251,6 +271,8 @@ class JournalRowForm(forms.Form):
                 self.add_error(f'{side}_account', '금액에 해당하는 계정과목을 선택하세요.')
         if data.get('memo') and not any(data.get(f'{side}_{field}') for side in ['debit', 'credit'] for field in ['account', 'amount']):
             self.add_error('memo', '적요만 입력할 수 없습니다. 해당 행에 계정과 금액도 입력하세요.')
+        if any(data.get(name) for name in VAT_FIELDS) and not (data.get('debit_account') or data.get('credit_account')):
+            self.add_error('vat_code', '부가세 정보를 입력한 행에 계정과 금액도 입력하세요.')
         return data
 
 
@@ -269,6 +291,20 @@ class BaseJournalRows(forms.BaseFormSet):
             raise forms.ValidationError('차변 합계와 대변 합계가 일치해야 저장할 수 있습니다.')
         if self.debit_total > Decimal('99999999999999'):
             raise forms.ValidationError('전표 합계는 99,999,999,999,999원 이하여야 합니다.')
+        tax_rows = [form.cleaned_data for form in self.forms if form.cleaned_data.get('vat_code')]
+        if tax_rows:
+            for trade, account, side in [('S', '2107', 'credit'), ('P', '1209', 'debit')]:
+                selected = [data for data in tax_rows if data['vat_trade'] == trade]
+                if not selected:
+                    continue
+                expected = sum((data['vat_amount'] if trade == 'S' or data['vat_deduction'] == 'C01' else
+                    data['vat_deductible'] if data['vat_deduction'] == 'C03' else Decimal(0) for data in selected), Decimal(0))
+                actual = sum((form.cleaned_data.get(f'{side}_amount') or Decimal(0) for form in self.forms
+                    if getattr(form.cleaned_data.get(f'{side}_account'), 'pk', None) == account), Decimal(0))
+                opposite = 'debit' if side == 'credit' else 'credit'
+                reversed_tax = any(getattr(form.cleaned_data.get(f'{opposite}_account'), 'pk', None) == account for form in self.forms)
+                if actual != expected or reversed_tax:
+                    raise forms.ValidationError(f'행별 부가세 합계에 맞춰 분개에 {account} 계정을 {"대변" if side == "credit" else "차변"} {expected:,.0f}원으로 입력하세요. 부가세는 자동 추가되지 않습니다.')
 
 
 JournalRows = forms.formset_factory(JournalRowForm, formset=BaseJournalRows, extra=5, max_num=5, validate_max=True, absolute_max=5)

@@ -1,0 +1,1 @@
+{% if item.status != 'completed' %}<form method="post" action="{% url 'receipt_analyze' item.pk %}" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='인식 중…'">{% csrf_token %}<button type="submit">{% if item.status == 'failed' %}다시 분석{% elif item.ocr_text %}다시 분석{% else %}영수증 분석{% endif %}</button></form>{% endif %}

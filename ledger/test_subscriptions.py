@@ -12,6 +12,7 @@ from .test_helpers import AuthenticatedLedgerTestCase
 class SubscriptionTests(AuthenticatedLedgerTestCase):
     def data(self, **overrides):
         data = {'company_name': '구독 업체', 'business_number': '1234567890', 'business_address': '서울 송파구',
+                'business_type': '서비스업', 'business_category': '경영 컨설팅',
                 'business_phone': '02-1234-5678', 'email': 'subscription@example.test', 'contact_name': '담당', 'contact_phone': '010-1234-5678'}
         data.update(overrides)
         return data
@@ -20,6 +21,8 @@ class SubscriptionTests(AuthenticatedLedgerTestCase):
         self.assertRedirects(self.client.post(reverse('member_registration'), self.data()), reverse('member_registration'))
         item = Subscription.objects.get(user=self.user)
         self.assertEqual(item.business_number, '123-45-67890')
+        self.assertEqual(item.business_type, '서비스업')
+        self.assertEqual(item.business_category, '경영 컨설팅')
         self.client.post(reverse('member_registration'), self.data(company_name='변경 업체'))
         self.assertEqual(Subscription.objects.count(), 1)
         admin = get_user_model().objects.create_user(username='subscription-admin', is_staff=True, is_superuser=True)
@@ -63,6 +66,8 @@ class SubscriptionTests(AuthenticatedLedgerTestCase):
         self.user.save(update_fields=['email'])
         values = self.data()
         values.pop('email')
+        values.pop('business_type')
+        values.pop('business_category')
         BusinessProfile.objects.create(user=self.user, **values)
         other = get_user_model().objects.create_user(username='incomplete-profile')
         BusinessProfile.objects.create(user=other, company_name='未完了')
@@ -72,3 +77,17 @@ class SubscriptionTests(AuthenticatedLedgerTestCase):
         self.assertEqual(Subscription.objects.count(), 1)
         self.assertEqual(Subscription.objects.get().email, 'legacy@example.test')
         self.assertEqual(BusinessProfile.objects.count(), 2)
+
+    def test_new_business_fields_are_required_and_preserved_on_invalid_submission(self):
+        url = reverse('member_registration')
+        for field in ['business_type', 'business_category']:
+            response = self.client.post(url, self.data(**{field: '   '}))
+            self.assertIn(field, response.context['form'].errors)
+        self.assertFalse(Subscription.objects.filter(user=self.user).exists())
+        self.client.post(url, self.data())
+        response = self.client.post(url, self.data(business_type='', business_category=''))
+        self.assertEqual(response.status_code, 200)
+        item = Subscription.objects.get(user=self.user)
+        self.assertEqual(item.business_type, '서비스업')
+        self.assertEqual(item.business_category, '경영 컨설팅')
+        self.assertContains(response, '사업자등록상 주소')

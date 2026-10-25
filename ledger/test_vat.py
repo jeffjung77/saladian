@@ -63,16 +63,16 @@ class VatTests(AuthenticatedLedgerTestCase):
 
     def test_journal_tax_must_match_manual_postings_and_is_not_added_twice(self):
         data = journal_data([('1101', '1100')], [('5001', '1000'), ('2107', '100')])
-        data.update(vat_code='T02', vat_trade='S', vat_document='D01', vat_amount='100')
+        data.update({'lines-0-vat_enabled': 'on', 'lines-0-vat_code': 'T02', 'lines-0-vat_trade': 'S', 'lines-0-vat_document': 'D01', 'lines-0-vat_amount': '100'})
         response = self.client.post(reverse('voucher_new'), data)
         self.assertEqual(response.status_code, 302)
         voucher = Voucher.objects.get()
         self.assertEqual(voucher.amount, 1100)
         bs = balance_sheet(date(2026, 12, 31), vouchers=Voucher.objects.filter(owner=self.user))
         self.assertEqual((bs['assets'], bs['liabilities'], bs['equity']), (1100, 100, 1000))
-        data['vat_amount'] = '200'
+        data['lines-0-vat_amount'] = '200'
         response = self.client.post(reverse('voucher_new'), data)
-        self.assertIn('vat_amount', response.context['form'].errors)
+        self.assertTrue(response.context['rows'].non_form_errors())
         self.assertEqual(Voucher.objects.count(), 1)
 
     def test_legacy_voucher_can_be_updated_to_vat(self):

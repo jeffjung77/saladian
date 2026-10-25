@@ -1,16 +1,66 @@
 {% extends 'ledger/base.html' %}{% block content %}
-<div class="heading"><div><h1>기타전표{% if voucher %} · 수정{% endif %}</h1><p class="muted">차변과 대변의 계정과목·금액을 각각 입력하세요. 양쪽 합계가 일치해야 저장됩니다.</p></div></div>
+<div class="heading"><div class="journal-heading"><h1>기타전표{% if voucher %} · 수정{% endif %}</h1><p class="muted">차변과 대변의 계정과목·금액을 각각 입력하세요. 양쪽 합계가 일치해야 저장됩니다.</p></div></div>
 {% if not voucher %}<div class="panel">{% include 'ledger/entry_links.html' %}</div>{% endif %}
 <form method="post" id="journal-form">{% csrf_token %}
-<section class="panel"><div class="form-grid">{{ form.non_field_errors }}{% for field in form %}<div {% if field.name == 'memo' %}class="wide"{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{{ field.errors }}{% if field.name == 'counterparty' %}{% include 'ledger/counterparty_picker.html' %}{% endif %}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}</div>{% endfor %}</div></section>
+<section class="panel"><div class="form-grid">{{ form.non_field_errors }}{% for field in form %}<div {% if field.name == 'memo' %}class="wide"{% elif field.name == 'date' %}class="journal-date-field"{% elif field.name == 'counterparty' %}class="journal-counterparty-field"{% elif field.name == 'is_closing' %}class="journal-closing-field"{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{{ field.errors }}{% if field.name == 'counterparty' %}{% include 'ledger/counterparty_picker.html' %}{% endif %}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}</div>{% endfor %}</div></section>
 <section class="panel">{{ rows.management_form }}{{ rows.non_form_errors }}
-<h2>분개 입력 · 차변 5행 / 대변 5행</h2>
-<div class="journal-scrollbar"><input type="range" id="journal-scroll-position" min="0" max="0" value="0" step="1" aria-label="?? ?? ? ?? ???" aria-controls="journal-scroll-area"></div>
+<h2>분개 입력 · 최대 5행</h2>
+
 <p class="muted">라인 적요는 같은 행의 차변·대변에 공통으로 적용됩니다. 사용하지 않는 칸은 비워두세요. 각 방향에서 계정과 금액을 함께 입력하며, 같은 행의 차변·대변 금액이 같을 필요는 없습니다.</p>
-<div id="journal-scroll-area" class="table-wrap journal-scroll" tabindex="0" role="region" aria-label="Journal entry horizontal scroll"><table class="journal-input"><colgroup><col style="width:32px"><col style="width:68px"><col style="width:20%"><col style="width:14%"><col style="width:68px"><col style="width:20%"><col style="width:14%"><col></colgroup><thead><tr><th scope="col">행</th><th scope="col">차변 코드</th><th scope="col">차변 계정과목</th><th scope="col">차변 금액(원)</th><th scope="col">대변 코드</th><th scope="col">대변 계정과목</th><th scope="col">대변 금액(원)</th><th scope="col">라인 적요</th></tr></thead><tbody>{% for row in rows %}<tr><th scope="row">{{ forloop.counter }}</th><td><label class="sr-only" for="{{ row.debit_code.id_for_label }}">{{ row.debit_code.label }}</label>{{ row.debit_code }}{{ row.debit_code.errors }}</td><td><label class="sr-only" for="{{ row.debit_name.id_for_label }}">{{ row.debit_name.label }}</label>{{ row.debit_name }}{{ row.debit_name.errors }}<label class="sr-only" for="{{ row.debit_account.id_for_label }}">{{ forloop.counter }}행 차변 계정과목</label>{{ row.debit_account }}{{ row.debit_account.errors }}</td><td><label class="sr-only" for="{{ row.debit_amount.id_for_label }}">{{ forloop.counter }}행 차변 금액</label>{{ row.debit_amount }}{{ row.debit_amount.errors }}</td><td><label class="sr-only" for="{{ row.credit_code.id_for_label }}">{{ row.credit_code.label }}</label>{{ row.credit_code }}{{ row.credit_code.errors }}</td><td><label class="sr-only" for="{{ row.credit_name.id_for_label }}">{{ row.credit_name.label }}</label>{{ row.credit_name }}{{ row.credit_name.errors }}<label class="sr-only" for="{{ row.credit_account.id_for_label }}">{{ forloop.counter }}행 대변 계정과목</label>{{ row.credit_account }}{{ row.credit_account.errors }}</td><td><label class="sr-only" for="{{ row.credit_amount.id_for_label }}">{{ forloop.counter }}행 대변 금액</label>{{ row.credit_amount }}{{ row.credit_amount.errors }}</td><td><label class="sr-only" for="{{ row.memo.id_for_label }}">{{ forloop.counter }}행 공통 적요</label>{{ row.memo }}{{ row.memo.errors }}</td></tr>{% endfor %}</tbody><tfoot><tr><th colspan="3">차변 합계</th><th class="num"><output id="debit-total">0</output>원</th><th colspan="2">대변 합계</th><th class="num"><output id="credit-total">0</output>원</th><th></th></tr></tfoot></table></div>
+<div id="journal-scroll-area" class="table-wrap journal-scroll" tabindex="0" role="region" aria-label="Journal entry horizontal scroll"><table class="journal-input"><colgroup><col style="width:32px"><col style="width:68px"><col style="width:220px"><col style="width:150px"><col style="width:68px"><col style="width:220px"><col style="width:150px"><col style="width:230px"><col style="width:100px"><col data-vat-column style="width:210px"><col data-vat-column style="width:120px"><col data-vat-column style="width:190px"><col data-vat-column style="width:190px"><col data-vat-column style="width:160px"><col data-vat-column style="width:170px"><col data-vat-column style="width:260px"></colgroup><thead>
+<tr class="journal-group-headings">
+<th scope="colgroup">행</th>
+<th scope="colgroup" colspan="3" class="journal-side-heading">차변</th>
+<th scope="colgroup" colspan="3" class="journal-side-heading">대변</th>
+<th scope="colgroup">적요</th>
+<th scope="colgroup">선택</th>
+<th scope="colgroup" colspan="7" data-vat-column>부가세 정보</th>
+</tr>
+<tr class="journal-field-headings">
+<th scope="col">번호</th>
+<th scope="col">코드</th><th scope="col">계정과목명</th><th scope="col">금액</th>
+<th scope="col">코드</th><th scope="col">계정과목명</th><th scope="col">금액</th>
+<th scope="col">라인 적요</th><th scope="col">부가세</th>
+<th scope="col" data-vat-column>부가세 코드</th><th scope="col" data-vat-column>매출·매입</th>
+<th scope="col" data-vat-column>증빙 종류</th><th scope="col" data-vat-column>매입세액 공제 구분</th>
+<th scope="col" data-vat-column>부가세 금액(원)</th><th scope="col" data-vat-column>공제할 세액(원)</th>
+<th scope="col" data-vat-column>불공제·안분 사유 / 검토 메모</th>
+</tr></thead><tbody>{% for row in rows %}<tr{% if forloop.counter > visible_rows %} hidden{% endif %}><th scope="row">{{ forloop.counter }}</th><td><label class="sr-only" for="{{ row.debit_code.id_for_label }}">{{ row.debit_code.label }}</label>{{ row.debit_code }}{{ row.debit_code.errors }}</td><td><label class="sr-only" for="{{ row.debit_account.id_for_label }}">{{ row.debit_account.label }}</label>{{ row.debit_account }}{{ row.debit_account.errors }}{{ row.debit_name.errors }}<datalist id="{{ row.prefix }}-debit-suggestions">{% for account in row.fields.debit_account.queryset %}<option value="{{ account }}"></option>{% endfor %}</datalist></td><td><label class="sr-only" for="{{ row.debit_amount.id_for_label }}">{{ forloop.counter }}행 차변 금액</label>{{ row.debit_amount }}{{ row.debit_amount.errors }}</td><td><label class="sr-only" for="{{ row.credit_code.id_for_label }}">{{ row.credit_code.label }}</label>{{ row.credit_code }}{{ row.credit_code.errors }}</td><td><label class="sr-only" for="{{ row.credit_account.id_for_label }}">{{ row.credit_account.label }}</label>{{ row.credit_account }}{{ row.credit_account.errors }}{{ row.credit_name.errors }}<datalist id="{{ row.prefix }}-credit-suggestions">{% for account in row.fields.credit_account.queryset %}<option value="{{ account }}"></option>{% endfor %}</datalist></td><td><label class="sr-only" for="{{ row.credit_amount.id_for_label }}">{{ forloop.counter }}행 대변 금액</label>{{ row.credit_amount }}{{ row.credit_amount.errors }}</td><td><label class="sr-only" for="{{ row.memo.id_for_label }}">{{ forloop.counter }}행 공통 적요</label>{{ row.memo }}{{ row.memo.errors }}</td><td class="vat-toggle-cell"><label class="sr-only" for="{{ row.vat_enabled.id_for_label }}">{{ forloop.counter }}행 부가세 입력?</label>{{ row.vat_enabled }}{{ row.vat_enabled.errors }}</td><td data-vat-column><div data-vat-fields><label class="sr-only" for="{{ row.vat_code.id_for_label }}">{{ row.vat_code.label }}</label>{{ row.vat_code }}{{ row.vat_code.errors }}</div></td><td data-vat-column><div data-vat-fields><label class="sr-only" for="{{ row.vat_trade.id_for_label }}">{{ row.vat_trade.label }}</label>{{ row.vat_trade }}{{ row.vat_trade.errors }}</div></td><td data-vat-column><div data-vat-fields><label class="sr-only" for="{{ row.vat_document.id_for_label }}">{{ row.vat_document.label }}</label>{{ row.vat_document }}{{ row.vat_document.errors }}</div></td><td data-vat-column><div data-vat-fields><label class="sr-only" for="{{ row.vat_deduction.id_for_label }}">{{ row.vat_deduction.label }}</label>{{ row.vat_deduction }}{{ row.vat_deduction.errors }}</div></td><td data-vat-column><div data-vat-fields><label class="sr-only" for="{{ row.vat_amount.id_for_label }}">{{ row.vat_amount.label }}</label>{{ row.vat_amount }}{{ row.vat_amount.errors }}</div></td><td data-vat-column><div data-vat-fields><label class="sr-only" for="{{ row.vat_deductible.id_for_label }}">{{ row.vat_deductible.label }}</label>{{ row.vat_deductible }}{{ row.vat_deductible.errors }}</div></td><td data-vat-column><div data-vat-fields><label class="sr-only" for="{{ row.vat_reason.id_for_label }}">{{ row.vat_reason.label }}</label>{{ row.vat_reason }}{{ row.vat_reason.errors }}</div></td></tr>{% endfor %}</tbody><tfoot><tr><th colspan="3">차변 합계</th><th class="num"><output id="debit-total">0</output>원</th><th colspan="2">대변 합계</th><th class="num"><output id="credit-total">0</output>원</th><th></th><th colspan="7" data-vat-column></th></tr></tfoot></table></div>
+<div class="journal-scrollbar"><input type="range" id="journal-scroll-position" min="0" max="0" value="0" step="1" aria-label="분개 입력 가로 스크롤" aria-controls="journal-scroll-area"></div>
+<div class="filter" style="margin-bottom:14px"><button type="button" class="secondary" id="journal-add-row">라인 추가</button><span class="muted" id="journal-row-count">{{ visible_rows }}/5</span><input type="hidden" name="visible_line_count" id="journal-visible-count" value="{{ visible_rows }}"></div>
 <p id="balance-message" role="status" aria-live="polite"></p><button type="submit">전표 저장</button> <a class="btn secondary" href="{% url 'dashboard' %}">취소</a>
 </section></form>
 <style>
+.journal-heading{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.journal-heading h1,.journal-heading p{margin:0}
+.journal-date-field{display:flex;align-items:center;gap:16px;flex-wrap:wrap;align-self:start}
+.journal-date-field label{margin:0;white-space:nowrap}
+.journal-date-field input[type="date"]{width:220px;max-width:100%}
+.journal-date-field .errorlist{flex-basis:100%}
+.journal-counterparty-field{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;align-self:start}
+.journal-counterparty-field>label{margin:0;white-space:nowrap}
+.journal-counterparty-field>select{flex:0 1 220px;min-width:160px;width:220px}
+.journal-counterparty-field>.filter{flex:0 0 auto;margin:0!important;gap:8px}
+.journal-counterparty-field>.help-text{flex:1 1 200px;margin:0}
+.journal-counterparty-field>.errorlist{flex-basis:100%}
+.journal-closing-field{grid-column:1/-1;display:grid;grid-template-columns:max-content max-content minmax(0,1fr);align-items:center;gap:10px 20px}
+.journal-closing-field>label{grid-column:1;grid-row:1;margin:0}
+.journal-closing-field>.help-text{grid-column:3;grid-row:1;margin:0}
+.journal-closing-field>input{grid-column:2;grid-row:1;justify-self:start;margin:0}
+.journal-closing-field>.errorlist{grid-column:1/-1}
+@media(min-width:1000px){#journal-form>.panel>.form-grid{grid-template-columns:320px minmax(0,1fr)}}
+.journal-input .journal-group-headings th{text-align:center;font-weight:600}
+.journal-input .journal-field-headings th{text-align:center}
+.journal-input thead th{white-space:nowrap;vertical-align:middle}
+
+.journal-input:not(.vat-visible){width:100%;min-width:1238px}
+.journal-input [hidden]{display:none!important}
+.journal-input .vat-toggle-cell{text-align:center}
+.journal-input [data-vat-fields] :disabled{background-color:#e5e7eb;color:#6b7280;opacity:1;cursor:not-allowed}
+.journal-input [data-vat-fields] input:enabled,.journal-input [data-vat-fields] select:enabled{background-color:#fff;color:#18312e}
+.journal-input .vat-toggle-cell label:not(.sr-only){display:flex;align-items:center;gap:4px;justify-content:center;font-weight:400;margin:0 0 6px}
+.journal-input input[name$="-vat_enabled"]{display:inline-block;width:16px;min-width:16px;height:16px;margin:0;padding:0}
+
 .journal-scrollbar{margin:0 0 14px}
 .journal-scrollbar input[type="range"]{display:block;appearance:none;-webkit-appearance:none;width:100%;height:20px;padding:0;margin:0;border:0;border-radius:10px;background:#e0e7e3;cursor:ew-resize;touch-action:pan-y}
 .journal-scrollbar input[type="range"]::-webkit-slider-runnable-track{height:20px;border-radius:10px;background:#e0e7e3}
@@ -19,8 +69,8 @@
 .journal-scrollbar input[type="range"]::-moz-range-thumb{width:var(--scroll-thumb-width,60px);height:20px;border:0;border-radius:10px;background:#64756d}
 .journal-scrollbar input:disabled{opacity:.4;cursor:default}
 
-.journal-scroll{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
-.journal-input{width:100%;min-width:1000px;max-width:none;table-layout:fixed;font-size:13px}
+.journal-scroll{width:100%;max-width:100%;max-height:420px;overflow-y:scroll;scrollbar-gutter:stable;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.journal-input{width:2638px;min-width:2638px;max-width:none;table-layout:fixed;font-size:13px}
 body:has(#journal-form) main{max-width:1480px}
 .journal-input th,.journal-input td{vertical-align:top;white-space:normal;overflow-wrap:anywhere;padding:10px 6px}
 .journal-input input,.journal-input select{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:9px 6px;font-size:13px}
@@ -55,4 +105,4 @@ body:has(#journal-form) main{max-width:1480px}
   update();
 })();
 </script>
-{% load static %}<script src="{% static 'ledger/journal_scroll.js' %}?v=1"></script><script src="{% static 'ledger/journal_accounts.js' %}?v=2"></script>{% include 'ledger/vat_help.html' %}{% endblock %}
+{% include 'ledger/journal_row_limit_notice.html' %}{% load static %}<script src="{% static 'ledger/journal_rows.js' %}?v=2"></script><script src="{% static 'ledger/journal_vat_toggle.js' %}?v=8"></script><script src="{% static 'ledger/journal_scroll.js' %}?v=1"></script><script src="{% static 'ledger/journal_accounts.js' %}?v=3"></script>{% include 'ledger/vat_help.html' %}{% endblock %}

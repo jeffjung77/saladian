@@ -1,0 +1,8 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><div><h1>게시글 {% if post %}수정{% else %}작성{% endif %}</h1><p class="muted">의견이나 오류 재현 방법을 작성해 주세요. 비밀번호·카드번호 등 민감한 정보는 입력하지 마세요.</p></div></div>
+<form method="post" enctype="multipart/form-data" class="panel">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}{% if field.name != 'attachments' %}<div class="auth-field"><label for="{{ field.id_for_label }}">{{ field.label }} *</label>{{ field }}{{ field.errors }}</div>{% endif %}{% endfor %}
+<section class="auth-field"><h2>사진 또는 파일 첨부</h2><div id="board-dropzone" style="border:2px dashed #8dc4ac;border-radius:10px;padding:24px;text-align:center"><label for="board-files">사진이나 파일을 이곳에 끌어 놓거나 선택하세요.</label>{{ form.attachments }}<p class="muted">최대 5개, 파일당 10MB까지 첨부할 수 있습니다.</p></div>{{ form.attachments.errors }}<div id="board-file-previews" aria-live="polite" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px"></div>
+{% if post %}{% for attachment in post.attachments.all %}<p><a href="{% url 'board_attachment' attachment.pk %}">{{ attachment.original_name }}</a> ({{ attachment.size|filesizeformat }}) <label style="display:inline;font-weight:normal"><input type="checkbox" name="remove_attachment" value="{{ attachment.pk }}"> 삭제</label></p>{% endfor %}{% endif %}<small class="help-text">입력 오류로 저장되지 않은 경우 새 첨부파일은 다시 선택해 주세요.</small></section>
+<button>저장</button> <a class="btn secondary" href="{% if post %}{% url 'board_detail' post.pk %}{% else %}{% url 'board_list' %}{% endif %}">취소</a></form>
+{% load static %}<script src="{% static 'ledger/board_attachments.js' %}?v=1"></script>
+{% endblock %}

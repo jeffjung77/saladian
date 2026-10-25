@@ -182,7 +182,7 @@ class MemberProfileForm(forms.ModelForm):
 
     class Meta:
         model = Subscription
-        fields = ['company_name', 'business_number', 'business_address', 'business_phone', 'email', 'contact_name', 'contact_phone']
+        fields = ['company_name', 'business_number', 'business_type', 'business_category', 'business_address', 'business_phone', 'email', 'contact_name', 'contact_phone']
         labels = {'contact_phone': '담당자 전화번호'}
 
 

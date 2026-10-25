@@ -5,6 +5,11 @@
 <section class="card"><h2>비용입력</h2><p class="muted">비용 거래와 공급가액·부가세를 입력합니다.</p><a class="btn" href="{% url 'expense_new' %}">비용전표 생성</a></section>
 <section class="card"><h2>기타전표</h2><p class="muted">차변·대변 계정과 금액을 직접 입력합니다.</p><a class="btn" href="{% url 'voucher_new' %}">기타전표 생성</a></section>
 </div>
+<div class="cards additional-entry-cards">
+<section class="card"><h2>국세청 자료 전표화</h2><p class="muted">국세청 자료를 바탕으로 전표를 생성합니다.</p><span class="badge">준비 중</span></section>
+<section class="card"><h2>영수증사진 비용처리</h2><p class="muted">촬영한 영수증 사진을 바탕으로 비용전표를 생성합니다.</p><a class="btn" id="receipt-photo-entry" href="{% url 'receipt_home' %}">사진으로 비용입력하기</a></section>
+</div>
+<style>.additional-entry-cards{grid-template-columns:repeat(2,minmax(0,1fr))}@media(max-width:700px){.additional-entry-cards{grid-template-columns:1fr}}</style>
 {% endblock %}
 
 {% block footer %}{% endblock %}

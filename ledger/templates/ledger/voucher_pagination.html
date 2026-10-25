@@ -1,0 +1,8 @@
+{% if voucher_page.has_other_pages %}
+<nav aria-label="전표 내역 페이지" class="filter" style="margin-top:16px">
+{% if voucher_page.has_previous %}<a class="btn secondary" href="?{{ page_query }}&amp;page={{ voucher_page.previous_page_number }}#voucher-list">이전</a>{% endif %}
+{% for number in page_numbers %}{% if number == voucher_page.paginator.ELLIPSIS %}<span>{{ number }}</span>{% elif number == voucher_page.number %}<span class="btn" aria-current="page">{{ number }}</span>{% else %}<a class="btn secondary" href="?{{ page_query }}&amp;page={{ number }}#voucher-list">{{ number }}</a>{% endif %}{% endfor %}
+{% if voucher_page.has_next %}<a class="btn secondary" href="?{{ page_query }}&amp;page={{ voucher_page.next_page_number }}#voucher-list">다음</a>{% endif %}
+<span class="muted">{{ voucher_page.start_index }}–{{ voucher_page.end_index }} / {{ count }}건</span>
+</nav>
+{% endif %}

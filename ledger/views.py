@@ -1,3 +1,5 @@
+from .models import JournalRowVAT
+from .vat import VAT_FIELDS
 from .excel import report_render
 from decimal import Decimal
 from datetime import timedelta
@@ -47,7 +49,7 @@ def business_overview(request):
     cash = {'1101': Decimal(0), '1102': Decimal(0)}
     changes = {}
     opening = Decimal(0)
-    for voucher in source.filter(date__lte=today).select_related('account_master', 'settlement_account').prefetch_related('journal_lines__account'):
+    for voucher in source.filter(date__lte=today).select_related('account_master', 'settlement_account').prefetch_related('journal_lines__account', 'row_vat'):
         postings, reason = reports.voucher_postings(voucher, accounts)
         if reason:
             continue
@@ -209,7 +211,7 @@ def partner_ledger(request):
             vouchers = vouchers.filter(date__gte=start)
         if end:
             vouchers = vouchers.filter(date__lte=end)
-        journal_vouchers = vouchers.filter(kind=Voucher.Kind.JOURNAL).prefetch_related('journal_lines__account').order_by('date', 'pk')
+        journal_vouchers = vouchers.filter(kind=Voucher.Kind.JOURNAL).prefetch_related('journal_lines__account', 'row_vat').order_by('date', 'pk')
         vouchers = vouchers.exclude(kind=Voucher.Kind.JOURNAL)
         running = opening
         for voucher in vouchers.order_by('date', 'pk'):
@@ -247,7 +249,12 @@ def dashboard(request):
     income, expense = totals['income'] or Decimal(0), totals['expense'] or Decimal(0)
     groups = vouchers.exclude(kind=Voucher.Kind.JOURNAL).order_by().values('kind', 'account', 'account_master_id').annotate(total=Sum('amount')).order_by('kind', '-total', 'account_master_id', 'account')
     journal_groups = JournalLine.objects.filter(voucher__in=vouchers).order_by().values('account_id', 'account__name').annotate(debit=Sum('amount', filter=Q(side='debit')), credit=Sum('amount', filter=Q(side='credit'))).order_by('account_id')
-    return report_render(request, 'ledger/dashboard.html', {'period': period, 'vouchers': vouchers.prefetch_related('journal_lines__account'), 'groups': groups, 'journal_groups': journal_groups, 'income': income, 'expense': expense, 'balance': income-expense, 'count': vouchers.count()})
+    vouchers = vouchers.prefetch_related('journal_lines__account', 'row_vat')
+    page = Paginator(vouchers, 10).get_page(request.GET.get('page'))
+    query = request.GET.copy()
+    query.pop('page', None)
+    query.pop('export', None)
+    return report_render(request, 'ledger/dashboard.html', {'period': period, 'vouchers': vouchers, 'voucher_page': page, 'page_query': query.urlencode(), 'page_numbers': page.paginator.get_elided_page_range(page.number, on_each_side=2, on_ends=1), 'groups': groups, 'journal_groups': journal_groups, 'income': income, 'expense': expense, 'balance': income-expense, 'count': page.paginator.count})
 
 
 @require_http_methods(['GET', 'POST'])
@@ -276,21 +283,17 @@ def journal_edit(request, voucher=None):
             initial[line.row - 1][f'{line.side}_account'] = line.account_id
             initial[line.row - 1][f'{line.side}_amount'] = line.amount
             initial[line.row - 1]['memo'] = line.memo
+    if voucher:
+        for tax in voucher.row_vat.all():
+            initial[tax.row - 1].update({name: getattr(tax, name) for name in VAT_FIELDS})
     data = request.POST if request.method == 'POST' else None
     form = JournalHeaderForm(data, instance=voucher, user=request.user)
     rows = JournalRows(data, prefix='lines', initial=initial, form_kwargs={'user': request.user})
     if request.method == 'POST':
         header_valid, rows_valid = form.is_valid(), rows.is_valid()
-        if header_valid and rows_valid and form.cleaned_data.get('vat_code'):
-            trade = form.cleaned_data['vat_trade']
-            account, side = ('2107', 'credit') if trade == 'S' else ('1209', 'debit')
-            expected = form.cleaned_data['vat_amount'] if trade == 'S' else (form.cleaned_data['vat_amount'] if form.cleaned_data['vat_deduction'] == 'C01' else form.cleaned_data['vat_deductible'] if form.cleaned_data['vat_deduction'] == 'C03' else Decimal(0))
-            actual = sum((row.cleaned_data.get(f'{side}_amount') or Decimal(0) for row in rows if getattr(row.cleaned_data.get(f'{side}_account'), 'pk', None) == account), Decimal(0))
-            opposite = 'debit' if side == 'credit' else 'credit'
-            reversed_tax = any(getattr(row.cleaned_data.get(f'{opposite}_account'), 'pk', None) == account for row in rows)
-            if actual != expected or reversed_tax:
-                form.add_error('vat_amount', f'분개에 {account} 계정을 {"대변" if side == "credit" else "차변"} {expected:,.0f}원으로 입력하세요. 부가세는 자동으로 추가되지 않습니다.')
-                header_valid = False
+        if any(data.get(name) for name in VAT_FIELDS):
+            form.add_error(None, '부가세 입력 위치가 행별 입력으로 변경되었습니다. 화면을 새로고침한 뒤 분개 행에 입력하세요.')
+            header_valid = False
         if header_valid and rows_valid:
             with transaction.atomic():
                 saved = form.save(commit=False)
@@ -300,6 +303,8 @@ def journal_edit(request, voucher=None):
                 saved.account = '복합전표'
                 saved.account_master = None
                 saved.amount = rows.debit_total
+                for name in VAT_FIELDS:
+                    setattr(saved, name, Decimal(0) if name in ('vat_amount', 'vat_deductible') else '')
                 saved.save()
                 request._audit_target = str(saved.pk)
                 saved.journal_lines.all().delete()
@@ -309,9 +314,22 @@ def journal_edit(request, voucher=None):
                         if row.cleaned_data.get(f'{side}_account'):
                             lines.append(JournalLine(voucher=saved, row=number, side=side, account=row.cleaned_data[f'{side}_account'], amount=row.cleaned_data[f'{side}_amount'], memo=row.cleaned_data.get('memo', '')))
                 JournalLine.objects.bulk_create(lines)
+                saved.row_vat.all().delete()
+                JournalRowVAT.objects.bulk_create([JournalRowVAT(voucher=saved, row=number,
+                    **{name: row.cleaned_data.get(name, '') for name in VAT_FIELDS})
+                    for number, row in enumerate(rows, start=1) if row.cleaned_data.get('vat_code')])
             messages.success(request, '차변·대변 전표를 저장했습니다.')
             return redirect('dashboard')
-    return render(request, 'ledger/journal_form.html', {'form': form, 'rows': rows, 'voucher': voucher, 'entry_type': 'other'})
+    visible_rows = max([1] + [number for number, initial_row in enumerate(initial, start=1) if initial_row])
+    if request.method == 'POST':
+        try:
+            visible_rows = max(visible_rows, min(5, max(1, int(request.POST.get('visible_line_count', 1)))))
+        except (ValueError, TypeError):
+            pass
+        for number, row in enumerate(rows, start=1):
+            if row.errors or any(row.data.get(row.add_prefix(field)) not in (None, '', '0') for field in row.fields):
+                visible_rows = max(visible_rows, number)
+    return render(request, 'ledger/journal_form.html', {'form': form, 'rows': rows, 'voucher': voucher, 'entry_type': 'other', 'visible_rows': visible_rows})
 
 
 @require_http_methods(['GET', 'POST'])

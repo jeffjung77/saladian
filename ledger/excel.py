@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.http import content_disposition_header
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
+from .models import JournalRowVAT
 
 MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 TITLES = {'income_statement': '손익계산서', 'balance_sheet': '대차대조표',
@@ -82,6 +83,9 @@ def report_render(request, template, context):
               [[v.date, v.pk, v.get_entry_type_display(), v.get_kind_display(), v.account_master_id or '', v.account_master.name if v.account_master_id else v.account, v.partner_label, v.amount, v.vat_amount, v.gross_amount, v.vat_display_code, v.memo] for v in vouchers])
         sheet('기타전표 분개', [['일자', '전표번호', '행', '차변 대변', '계정코드', '계정과목', '금액', '라인 적요']] +
               [[v.date, v.pk, line.row, '차변' if line.side == 'debit' else '대변', line.account_id, line.account.name, line.amount, line.memo] for v in vouchers if v.is_journal for line in v.journal_lines.all()])
+        sheet('기타전표 행별 부가세', [['전표번호', '행', '부가세 코드', '매출·매입', '증빙 종류', '공제 구분', '부가세', '공제할 세액', '사유']] +
+              [[tax.voucher_id, tax.row, tax.vat_code, tax.get_vat_trade_display(), tax.get_vat_document_display(), tax.get_vat_deduction_display(), tax.vat_amount, tax.vat_deductible, tax.vat_reason]
+               for tax in JournalRowVAT.objects.filter(voucher_id__in=[v.pk for v in vouchers])])
         if kind == 'dashboard':
             sheet('계정과목별 공급가액', [['구분', '계정코드', '계정과목', '합계']] + [[g['kind'], g['account_master_id'], g['account'], g['total']] for g in context['groups']])
             sheet('차대변 계정별 집계', [['계정코드', '계정과목', '차변', '대변']] + [[g['account_id'], g['account__name'], g['debit'] or 0, g['credit'] or 0] for g in context['journal_groups']])

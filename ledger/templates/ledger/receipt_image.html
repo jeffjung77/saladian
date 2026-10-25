@@ -1,0 +1,6 @@
+<div class="receipt-image-viewer">
+<div class="receipt-image-controls"><button type="button" class="secondary" data-rotate="-90">↶ 왼쪽 회전</button><button type="button" class="secondary" data-rotate="90">↷ 오른쪽 회전</button><button type="button" class="secondary" data-rotate="reset">원래 방향</button><span class="muted" data-rotation-label aria-live="polite">0°</span></div>
+<div class="receipt-image-stage"><img src="{% url 'receipt_photo' item.pk %}" alt="영수증 원본" data-receipt-image></div>
+</div>
+<style>.receipt-image-viewer{min-width:0;max-width:100%}.receipt-image-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px}.receipt-image-controls button{padding:8px 10px;font-size:13px}.receipt-image-stage{position:relative;width:100%;overflow:hidden}.receipt-image-stage img{position:absolute;display:block;max-width:none;transform-origin:center;left:50%;top:50%}</style>
+{% load static %}<script src="{% static 'ledger/receipt_image.js' %}?v=1" defer></script>

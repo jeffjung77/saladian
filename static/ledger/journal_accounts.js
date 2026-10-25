@@ -1,46 +1,24 @@
 (() => {
   document.querySelectorAll('.journal-input tbody tr').forEach(row => {
     for (const side of ['debit', 'credit']) {
-      const select = row.querySelector(`select[name$="-${side}_account"]`);
+      const account = row.querySelector(`input[name$="-${side}_account"]`);
       const code = row.querySelector(`input[name$="-${side}_code"]`);
-      const name = row.querySelector(`input[name$="-${side}_name"]`);
-      const options = Array.from(select.options).filter(option => option.value);
-      const accountName = option => option.textContent.split(' · ').slice(1).join(' · ').trim();
-      function resetFilter() {Array.from(select.options).forEach(option => {option.hidden = false;});}
-      function selected() {
-        const option = options.find(option => option.value === select.value);
-        code.value = option ? option.value : '';
-        name.value = option ? accountName(option) : '';
-        resetFilter(); select.size = 1;
-      }
-      select.addEventListener('change', selected);
+      if (!account || !code) continue;
+      const choices = Array.from(document.getElementById(account.getAttribute('list')).options).map(option => {
+        const [id, ...name] = option.value.split(' \u00b7 ');
+        return {id, name: name.join(' \u00b7 '), label: option.value};
+      });
       code.addEventListener('input', () => {
-        resetFilter(); select.size = 1;
-        const option = options.find(option => option.value === code.value.trim());
-        select.value = option ? option.value : '';
-        name.value = option ? accountName(option) : '';
-        if (option) select.scrollTop = option.offsetTop;
+        const match = choices.find(choice => choice.id === code.value.trim());
+        account.value = match ? match.label : '';
       });
-      name.addEventListener('input', () => {
-        const query = name.value.trim().toLocaleLowerCase();
-        code.value = ''; select.value = '';
-        const matches = options.filter(option => option.value.includes(query) || accountName(option).toLocaleLowerCase().includes(query));
-        options.forEach(option => {option.hidden = !!query && !matches.includes(option);});
-        const exact = matches.filter(option => option.value === query || accountName(option).toLocaleLowerCase() === query);
-        if (exact.length === 1) {
-          select.value = exact[0].value; code.value = exact[0].value;
-        }
-        select.size = query ? 4 : 1;
+      account.addEventListener('input', () => {
+        const text = account.value.trim();
+        const matches = choices.filter(choice => [choice.id, choice.name, choice.label].includes(text));
+        code.value = matches.length === 1 ? matches[0].id : '';
       });
-      name.addEventListener('keydown', event => {
-        if (event.key === 'ArrowDown') {event.preventDefault(); select.focus();}
-        if (event.key === 'Escape') {resetFilter(); select.size = 1;}
-      });
-      select.addEventListener('keydown', event => {
-        if (event.key === 'Enter') {event.preventDefault(); selected();}
-        if (event.key === 'Escape') {resetFilter(); select.size = 1; name.focus();}
-      });
-      if (!code.value && !name.value && select.value) selected();
+      const match = choices.find(choice => choice.id === account.value);
+      if (match) account.value = match.label;
     }
   });
 })();

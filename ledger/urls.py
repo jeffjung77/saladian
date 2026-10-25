@@ -3,9 +3,27 @@ from . import views
 from . import auth_views
 from . import audit_views
 from . import company_views
+from . import board_views
+from . import receipt_views
+from . import vision_usage_views
 
 urlpatterns = [
+    path('receipts/', receipt_views.receipt_home, name='receipt_home'),
+    path('receipts/history/', receipt_views.receipt_history, name='receipt_history'),
+    path('receipts/<int:pk>/', receipt_views.receipt_detail, name='receipt_detail'),
+    path('receipts/<int:pk>/analyze/', receipt_views.receipt_analyze, name='receipt_analyze'),
+    path('receipts/<int:pk>/expense/', receipt_views.receipt_expense, name='receipt_expense'),
+    path('receipts/<int:pk>/photo/', receipt_views.receipt_photo, name='receipt_photo'),
+    path('board/<int:pk>/comments/new/', board_views.board_comment_new, name='board_comment_new'),
+    path('board/comments/<int:pk>/delete/', board_views.board_comment_delete, name='board_comment_delete'),
+    path('board/attachments/<int:pk>/', board_views.board_attachment, name='board_attachment'),
+    path('board/', board_views.board_list, name='board_list'),
+    path('board/new/', board_views.board_edit, name='board_new'),
+    path('board/<int:pk>/', board_views.board_detail, name='board_detail'),
+    path('board/<int:pk>/edit/', board_views.board_edit, name='board_edit'),
+    path('board/<int:pk>/delete/', board_views.board_delete, name='board_delete'),
     path('system/companies/', company_views.company_list, name='company_list'),
+    path('system/companies/vision-usage/', vision_usage_views.vision_usage, name='vision_usage'),
     path('system/companies/<int:company_id>/', company_views.company_detail, name='company_detail'),
     path('system/logs/', audit_views.audit_logs, name='audit_logs'),
     path('system/subscriptions/', auth_views.subscription_list, name='subscription_list'),
