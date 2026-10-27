@@ -1,15 +1,44 @@
 {% extends 'ledger/base.html' %}{% block content %}
-<div class="heading"><div><h1>전표입력</h1><p class="muted">입력할 전표 종류를 선택하세요.</p></div></div>
+<div class="heading"><div class="entry-page-heading"><h1>전표입력</h1><p class="muted">입력할 전표 종류를 선택하세요.</p></div></div>
 <div class="cards">
-<section class="card"><h2>매출입력</h2><p class="muted">매출 거래와 공급가액·부가세를 입력합니다.</p><a class="btn" href="{% url 'sales_new' %}">매출전표 생성</a></section>
-<section class="card"><h2>비용입력</h2><p class="muted">비용 거래와 공급가액·부가세를 입력합니다.</p><a class="btn" href="{% url 'expense_new' %}">비용전표 생성</a></section>
-<section class="card"><h2>기타전표</h2><p class="muted">차변·대변 계정과 금액을 직접 입력합니다.</p><a class="btn" href="{% url 'voucher_new' %}">기타전표 생성</a></section>
+<section class="card"><div class="entry-card-heading"><h2>매출입력</h2><span class="entry-help"><button type="button" class="entry-help-icon" aria-label="매출 거래와 공급가액·부가세를 입력합니다." aria-describedby="entry-help-1"><span aria-hidden="true">i</span></button><span class="entry-tooltip" role="tooltip" id="entry-help-1">매출 거래와 공급가액·부가세를 입력합니다.</span></span><a class="btn" href="{% url 'sales_new' %}">매출전표 생성</a></div></section>
+<section class="card"><div class="entry-card-heading"><h2>비용입력</h2><span class="entry-help"><button type="button" class="entry-help-icon" aria-label="비용 거래와 공급가액·부가세를 입력합니다." aria-describedby="entry-help-2"><span aria-hidden="true">i</span></button><span class="entry-tooltip" role="tooltip" id="entry-help-2">비용 거래와 공급가액·부가세를 입력합니다.</span></span><a class="btn" href="{% url 'expense_new' %}">비용전표 생성</a></div></section>
+<section class="card"><div class="entry-card-heading"><h2>일반전표</h2><span class="entry-help"><button type="button" class="entry-help-icon" aria-label="차변·대변 계정과 금액을 직접 입력합니다." aria-describedby="entry-help-3"><span aria-hidden="true">i</span></button><span class="entry-tooltip" role="tooltip" id="entry-help-3">차변·대변 계정과 금액을 직접 입력합니다.</span></span><a class="btn" href="{% url 'voucher_new' %}">일반전표 생성</a></div></section>
 </div>
 <div class="cards additional-entry-cards">
-<section class="card"><h2>국세청 자료 전표화</h2><p class="muted">국세청 자료를 바탕으로 전표를 생성합니다.</p><span class="badge">준비 중</span></section>
-<section class="card"><h2>영수증사진 비용처리</h2><p class="muted">촬영한 영수증 사진을 바탕으로 비용전표를 생성합니다.</p><a class="btn" id="receipt-photo-entry" href="{% url 'receipt_home' %}">사진으로 비용입력하기</a></section>
+<section class="card"><div class="entry-card-heading"><h2>국세청 자료 전표화</h2><span class="entry-help"><button type="button" class="entry-help-icon" aria-label="국세청 자료를 바탕으로 전표를 생성합니다." aria-describedby="entry-help-4"><span aria-hidden="true">i</span></button><span class="entry-tooltip" role="tooltip" id="entry-help-4">국세청 자료를 바탕으로 전표를 생성합니다.</span></span><span class="badge">준비 중</span></div></section>
+<section class="card"><div class="entry-card-heading"><h2>영수증사진 비용처리</h2><span class="entry-help"><button type="button" class="entry-help-icon" aria-label="촬영한 영수증 사진을 바탕으로 비용전표를 생성합니다." aria-describedby="entry-help-5"><span aria-hidden="true">i</span></button><span class="entry-tooltip" role="tooltip" id="entry-help-5">촬영한 영수증 사진을 바탕으로 비용전표를 생성합니다.</span></span><a class="btn" id="receipt-photo-entry" href="{% url 'receipt_home' %}">사진으로 비용입력하기</a></div></section>
 </div>
-<style>.additional-entry-cards{grid-template-columns:repeat(2,minmax(0,1fr))}@media(max-width:700px){.additional-entry-cards{grid-template-columns:1fr}}</style>
+<style>
+.entry-page-heading{display:flex;align-items:baseline;gap:8px 18px;flex-wrap:wrap}.heading .entry-page-heading p{margin:0}
+
+.entry-card-heading{--entry-title-size:18px;position:relative;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:0}
+.entry-card-heading h2{font-size:var(--entry-title-size);margin:0;min-width:0;overflow-wrap:anywhere}
+.entry-card-heading>.btn,.entry-card-heading>.badge{flex-shrink:0}.entry-help{display:inline-flex;flex-shrink:0}
+.entry-help-icon{display:inline-flex;align-items:center;justify-content:center;width:calc(var(--entry-title-size) * 2 / 3);height:calc(var(--entry-title-size) * 2 / 3);padding:0;border:1px solid currentColor;border-radius:50%;background:transparent;color:var(--ink);font:bold calc(var(--entry-title-size) * 4 / 9)/1 Georgia,serif;cursor:help}
+.entry-help-icon:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.entry-tooltip{display:none;position:absolute;top:calc(100% + 8px);left:0;width:320px;max-width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:white;color:var(--ink);box-shadow:0 5px 18px #18312e26;font-size:14px;font-weight:400;line-height:1.6;overflow-wrap:anywhere;z-index:20}
+.entry-help.is-open .entry-tooltip,.entry-help-icon:focus-visible+.entry-tooltip{display:block}
+@media(hover:hover){.entry-help:hover .entry-tooltip{display:block}}
+.additional-entry-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:700px){.additional-entry-cards{grid-template-columns:1fr}}
+</style>
+<script>
+(() => {
+ const helps = document.querySelectorAll('.entry-help');
+ helps.forEach(help => help.querySelector('button').addEventListener('click', () => {
+   const open = help.classList.contains('is-open');
+   helps.forEach(item => item.classList.remove('is-open'));
+   if (!open) help.classList.add('is-open');
+ }));
+ document.addEventListener('click', event => {
+   if (!event.target.closest('.entry-help')) helps.forEach(help => help.classList.remove('is-open'));
+ });
+ document.addEventListener('keydown', event => {
+   if (event.key === 'Escape') {helps.forEach(help => help.classList.remove('is-open')); if (document.activeElement.matches('.entry-help-icon')) document.activeElement.blur();}
+ });
+})();
+</script>
 {% endblock %}
 
 {% block footer %}{% endblock %}

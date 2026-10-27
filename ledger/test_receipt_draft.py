@@ -8,6 +8,18 @@ from .test_helpers import AuthenticatedLedgerTestCase
 
 
 class ReceiptDraftTests(AuthenticatedLedgerTestCase):
+    def test_custom_expense_limit_rolls_back_photo_usage_and_status(self):
+        from .models import VoucherQuota, VoucherCreationUsage
+        VoucherQuota.objects.create(owner=self.user, expense_limit=0, photo_limit=20)
+        response = self.client.post(self.url, self.data())
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['form'].non_field_errors())
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, 'review')
+        self.assertFalse(Voucher.objects.exists())
+        self.assertFalse(ReceiptCreationUsage.objects.exists())
+        self.assertFalse(VoucherCreationUsage.objects.exists())
+
     def setUp(self):
         super().setUp()
         self.item = ReceiptPhoto.objects.create(owner=self.user, photo='test.jpg', image_type='image/jpeg',

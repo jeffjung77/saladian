@@ -143,4 +143,4 @@ class SystemMemberTests(AuthenticatedLedgerTestCase):
         get_user_model().objects.bulk_create([get_user_model()(username=f'page-member-{i}') for i in range(25)])
         response = self.client.get(url, {'page': 2})
         self.assertEqual(response.context['page'].number, 2)
-        self.assertEqual(len(response.context['page']), 2)
+        self.assertEqual(len(response.context['page']), 10)

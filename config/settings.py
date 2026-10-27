@@ -66,6 +66,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'ledger.notice_popup.notice_context',
             ],
         },
     },
@@ -133,3 +134,15 @@ LOGOUT_REDIRECT_URL = 'login'
 
 # Private uploads are served only through owner-checked views.
 MEDIA_ROOT = BASE_DIR / 'private_uploads'
+
+# Gmail SMTP credentials belong in the server environment, never in source control.
+EMAIL_BACKEND = os.environ.get('DJANGO_EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('DJANGO_EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('DJANGO_EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('DJANGO_EMAIL_USE_TLS', '1') == '1'
+EMAIL_HOST_USER = os.environ.get('DJANGO_EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('DJANGO_EMAIL_HOST_PASSWORD', '')
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get('DJANGO_DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'webmaster@localhost')
+BOARD_EMAIL_ENABLED = os.environ.get('DJANGO_BOARD_EMAIL_ENABLED', '1' if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD else '0') == '1'
+BOARD_SITE_URL = os.environ.get('DJANGO_BOARD_SITE_URL', '').rstrip('/')

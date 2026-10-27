@@ -19,6 +19,10 @@ class AccountEntryField(forms.ModelChoiceField):
         if len(matches) == 1:
             return matches[0]
         if len(matches) > 1:
+            code = getattr(self, 'account_code', '')
+            account = self.queryset.filter(pk=code, name=text).first() if code else None
+            if account:
+                return account
             raise forms.ValidationError('같은 이름의 계정이 여러 개입니다. 계정코드를 입력하세요.')
         raise forms.ValidationError('사용 가능한 계정코드 또는 정확한 계정과목명을 입력하세요.')
 

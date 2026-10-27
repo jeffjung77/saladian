@@ -14,3 +14,8 @@ staticfiles/
 .vscode/
 
 private_uploads/
+desktop_static/
+build/
+dist/
+desktop/build-data/
+*.spec

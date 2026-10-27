@@ -1,6 +1,8 @@
 from django import forms
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from django.db import transaction
@@ -10,7 +12,10 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.urls import reverse
 from urllib.parse import urlencode
-from .models import BoardPost, BoardAttachment, BoardComment
+from .models import BoardPost, BoardAttachment, BoardComment, Notice
+from .board_email import notify_new_post
+from .credits import reward_post
+from .models import CreditAccount
 
 
 class MultiFileInput(forms.ClearableFileInput):
@@ -53,22 +58,33 @@ class PostForm(forms.ModelForm):
         widgets = {'body': forms.Textarea(attrs={'rows': 12})}
 
 
+def visible_posts(user):
+    posts = BoardPost.objects.all()
+    return posts if user.is_superuser else posts.filter(author=user)
+
+
 @never_cache
 @login_required
 @require_GET
 def board_list(request):
     query = request.GET.get('q', '').strip()[:100]
-    posts = BoardPost.objects.select_related('author').annotate(comment_count=Count('comments')).order_by('-created_at', '-pk')
+    author = request.GET.get('author', '').strip()[:150] if request.user.is_superuser else ''
+    posts = visible_posts(request.user).select_related('author').annotate(comment_count=Count('comments')).order_by('-created_at', '-pk')
+    if author:
+        posts = posts.filter(author__username=author)
     if query:
         posts = posts.filter(Q(title__icontains=query) | Q(body__icontains=query))
-    return render(request, 'ledger/board_list.html', {'page': Paginator(posts, 20).get_page(request.GET.get('page')), 'q': query})
+    balance = CreditAccount.objects.filter(owner=request.user).values_list('balance', flat=True).first() or 0
+    return render(request, 'ledger/board_list.html', {'page': Paginator(posts, 20).get_page(request.GET.get('page')), 'q': query, 'author_filter': author,
+        'board_authors': get_user_model().objects.order_by('username').values_list('username', flat=True) if request.user.is_superuser else [],
+        'credit_balance': balance, 'notices': Notice.objects.active()})
 
 
 @never_cache
 @login_required
 @require_GET
 def board_detail(request, pk):
-    post = get_object_or_404(BoardPost.objects.select_related('author'), pk=pk)
+    post = get_object_or_404(visible_posts(request.user).select_related('author'), pk=pk)
     return render(request, 'ledger/board_detail.html', {'post': post, 'comments': post.comments.select_related('author'), 'can_edit': post.author_id == request.user.pk or request.user.is_superuser})
 
 
@@ -103,12 +119,17 @@ def board_edit(request, pk=None):
                         storage, name = item.file.storage, item.file.name
                         item.delete()
                         transaction.on_commit(lambda storage=storage, name=name: storage.delete(name))
+                if not post:
+                    reward_post(saved)
+                    path = reverse('board_detail', args=[saved.pk])
+                    url = settings.BOARD_SITE_URL + path if settings.BOARD_SITE_URL else request.build_absolute_uri(path)
+                    transaction.on_commit(lambda post_id=saved.pk, url=url: notify_new_post(post_id, url), robust=True)
         except Exception:
             for item in created:
                 item.file.delete(save=False)
             raise
         request._audit_target = saved.pk
-        messages.success(request, '게시글을 저장했습니다.')
+        messages.success(request, '게시글을 저장했습니다.' if post else '게시글을 저장했습니다. 100크레딧이 지급되었습니다.')
         return redirect('board_detail', pk=saved.pk)
     return render(request, 'ledger/board_form.html', {'form': form, 'post': post})
 
@@ -134,7 +155,7 @@ def board_delete(request, pk):
 @login_required
 @require_GET
 def board_attachment(request, pk):
-    item = get_object_or_404(BoardAttachment, pk=pk)
+    item = get_object_or_404(BoardAttachment.objects.filter(post__in=visible_posts(request.user)), pk=pk)
     preview = request.GET.get('preview') == '1' and bool(item.image_type)
     try:
         response = FileResponse(item.file.open('rb'), as_attachment=not preview, filename=item.original_name,
@@ -157,7 +178,7 @@ class CommentForm(forms.ModelForm):
 @login_required
 @require_POST
 def board_comment_new(request, pk):
-    post = get_object_or_404(BoardPost, pk=pk)
+    post = get_object_or_404(visible_posts(request.user), pk=pk)
     form = CommentForm(request.POST)
     if form.is_valid():
         comment = form.save(commit=False)
@@ -167,7 +188,8 @@ def board_comment_new(request, pk):
         request._audit_target = comment.pk
         messages.success(request, '댓글을 등록했습니다.')
         if request.POST.get('return_to') == 'list':
-            query = urlencode({'q': request.POST.get('q', '')[:100], 'page': request.POST.get('page', '1')[:10]})
+            query = urlencode({'q': request.POST.get('q', '')[:100], 'page': request.POST.get('page', '1')[:10],
+                               'author': request.POST.get('author', '')[:150] if request.user.is_superuser else ''})
             return redirect(f"{reverse('board_list')}?{query}#post-{post.pk}")
         return redirect(f"{reverse('board_detail', args=[post.pk])}#comments")
     return render(request, 'ledger/board_comment_form.html', {'post': post, 'form': form}, status=400)
@@ -177,7 +199,7 @@ def board_comment_new(request, pk):
 @login_required
 @require_POST
 def board_comment_delete(request, pk):
-    comment = get_object_or_404(BoardComment, pk=pk)
+    comment = get_object_or_404(BoardComment.objects.filter(post__in=visible_posts(request.user)), pk=pk)
     if comment.author_id != request.user.pk and not request.user.is_superuser:
         return render(request, 'ledger/permission_denied.html', status=403)
     post_id = comment.post_id

@@ -1,0 +1,8 @@
+{% if form.quota_popup %}
+{{ form.quota_popup|json_script:"voucher-quota-message" }}
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+    window.alert(JSON.parse(document.getElementById('voucher-quota-message').textContent));
+}, {once: true});
+</script>
+{% endif %}

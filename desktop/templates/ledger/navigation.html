@@ -1,0 +1,5 @@
+{% if user.is_authenticated %}<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<a class="btn secondary" href="{% url 'voucher_entry' %}">전표입력</a><a class="btn secondary" href="{% url 'business_overview' %}">사업현황</a>
+<details><summary class="btn secondary">보고서</summary><div><a href="{% url 'income_statement' %}">손익계산서</a> · <a href="{% url 'balance_sheet' %}">대차대조표</a> · <a href="{% url 'dashboard' %}">전표집계</a> · <a href="{% url 'account_ledger' %}">계정별 원장</a> · <a href="{% url 'partner_ledger' %}">거래처별 원장</a></div></details>
+<a class="btn secondary" href="{% url 'receipt_home' %}">영수증 사진</a><a class="btn secondary" href="{% url 'counterparties' %}">거래처</a><a class="btn secondary" href="{% url 'accounts' %}">계정과목</a><a class="btn secondary" href="{% url 'desktop_password' %}">비밀번호 변경</a>
+<form method="post" action="{% url 'logout' %}" style="margin:0">{% csrf_token %}<button class="secondary">로그아웃</button></form></div>{% endif %}

@@ -1,5 +1,6 @@
 {% extends 'ledger/base.html' %}{% load humanize %}{% block content %}
-<div class="heading"><div><h1>계정별원장</h1><p class="muted">계정과목과 기간을 선택해 차변·대변 거래 및 잔액을 확인하세요.</p></div></div>
+<style>.report-page-heading{display:flex;align-items:baseline;gap:8px 18px;flex-wrap:wrap;min-width:0}.heading .report-page-heading p{margin:0}</style>
+<div class="heading"><div class="report-page-heading"><h1>계정별원장</h1><p class="muted">계정과목과 기간을 선택해 차변·대변 거래 및 잔액을 확인하세요.</p></div></div>
 {% include 'ledger/report_header.html' %}
 {% if report %}<h2>{{ report.account }} · {{ form.cleaned_data.start|date:'Y-m-d' }} ~ {{ form.cleaned_data.end|date:'Y-m-d' }}</h2>
 {% include 'ledger/report_status.html' %}

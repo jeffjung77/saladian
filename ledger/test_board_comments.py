@@ -13,6 +13,8 @@ class BoardCommentTests(AuthenticatedLedgerTestCase):
         self.url = reverse('board_comment_new', args=[self.post.pk])
 
     def test_list_submission_count_detail_and_escaping(self):
+        self.other.is_superuser = True
+        self.other.save()
         self.client.force_login(self.other)
         response = self.client.post(self.url, {'body': '<script>test</script>', 'author': self.user.pk,
                                              'return_to': 'list', 'page': 1, 'q': 'Feedback'})
@@ -41,6 +43,9 @@ class BoardCommentTests(AuthenticatedLedgerTestCase):
         self.assertEqual(self.client.post(url).status_code, 403)
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertEqual(self.client.post(url).status_code, 404)
+        self.other.is_superuser = True
+        self.other.save()
         self.assertEqual(self.client.post(url).status_code, 302)
         comment = BoardComment.objects.create(post=self.post, author=self.other, body='Reply')
         self.user.is_superuser = True

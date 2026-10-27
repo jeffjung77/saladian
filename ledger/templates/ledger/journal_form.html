@@ -1,13 +1,11 @@
 {% extends 'ledger/base.html' %}{% block content %}
-<div class="heading"><div class="journal-heading"><h1>기타전표{% if voucher %} · 수정{% endif %}</h1><p class="muted">차변과 대변의 계정과목·금액을 각각 입력하세요. 양쪽 합계가 일치해야 저장됩니다.</p></div></div>
+<div class="heading"><div class="journal-heading"><h1>일반전표{% if voucher %} · 수정{% endif %}</h1><p class="muted">차변과 대변의 계정과목·금액을 각각 입력하세요. 양쪽 합계가 일치해야 저장됩니다.</p></div></div>
 {% if not voucher %}<div class="panel">{% include 'ledger/entry_links.html' %}</div>{% endif %}
 <form method="post" id="journal-form">{% csrf_token %}
-<section class="panel"><div class="form-grid">{{ form.non_field_errors }}{% for field in form %}<div {% if field.name == 'memo' %}class="wide"{% elif field.name == 'date' %}class="journal-date-field"{% elif field.name == 'counterparty' %}class="journal-counterparty-field"{% elif field.name == 'is_closing' %}class="journal-closing-field"{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{{ field.errors }}{% if field.name == 'counterparty' %}{% include 'ledger/counterparty_picker.html' %}{% endif %}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}</div>{% endfor %}</div></section>
+<section class="panel"><div class="form-grid">{{ form.non_field_errors }}{% for field in form %}{% if field.name == 'is_closing' %}{{ field.as_hidden }}{% else %}<div {% if field.name == 'memo' %}class="wide"{% elif field.name == 'date' %}class="journal-date-field"{% elif field.name == 'counterparty' %}class="journal-counterparty-field"{% elif field.name == 'is_closing' %}class="journal-closing-field"{% endif %}><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{% if field.name == 'is_closing' %}<span class="journal-section-info closing-info" tabindex="0" role="img" aria-label="{{ field.help_text }}" title="{{ field.help_text }}">ⓘ</span>{% endif %}{{ field }}{{ field.errors }}{% if field.name == 'counterparty' %}{% include 'ledger/counterparty_picker.html' %}{% endif %}{% if field.help_text and field.name != 'is_closing' %}<small class="help-text">{{ field.help_text }}</small>{% endif %}</div>{% endif %}{% endfor %}</div></section>
 <section class="panel">{{ rows.management_form }}{{ rows.non_form_errors }}
-<h2>분개 입력 · 최대 5행</h2>
-
-<p class="muted">라인 적요는 같은 행의 차변·대변에 공통으로 적용됩니다. 사용하지 않는 칸은 비워두세요. 각 방향에서 계정과 금액을 함께 입력하며, 같은 행의 차변·대변 금액이 같을 필요는 없습니다.</p>
-<div id="journal-scroll-area" class="table-wrap journal-scroll" tabindex="0" role="region" aria-label="Journal entry horizontal scroll"><table class="journal-input"><colgroup><col style="width:32px"><col style="width:68px"><col style="width:220px"><col style="width:150px"><col style="width:68px"><col style="width:220px"><col style="width:150px"><col style="width:230px"><col style="width:100px"><col data-vat-column style="width:210px"><col data-vat-column style="width:120px"><col data-vat-column style="width:190px"><col data-vat-column style="width:190px"><col data-vat-column style="width:160px"><col data-vat-column style="width:170px"><col data-vat-column style="width:260px"></colgroup><thead>
+<div class="journal-section-heading"><h2>분개 입력 · 최대 5행</h2><span class="journal-section-info" tabindex="0" role="img" aria-label="라인 적요는 같은 행의 차변·대변에 공통으로 적용됩니다. 사용하지 않는 칸은 비워두세요. 각 방향에서 계정과 금액을 함께 입력하며, 같은 행의 차변·대변 금액이 같을 필요는 없습니다." title="라인 적요는 같은 행의 차변·대변에 공통으로 적용됩니다. 사용하지 않는 칸은 비워두세요. 각 방향에서 계정과 금액을 함께 입력하며, 같은 행의 차변·대변 금액이 같을 필요는 없습니다.">ⓘ</span></div>
+<div id="journal-scroll-area" class="table-wrap journal-scroll" tabindex="0" role="region" aria-label="Journal entry horizontal scroll"><table class="journal-input"><colgroup><col style="width:32px"><col style="width:62px"><col style="width:150px"><col style="width:130px"><col style="width:62px"><col style="width:150px"><col style="width:130px"><col style="width:230px"><col style="width:100px"><col data-vat-column style="width:210px"><col data-vat-column style="width:120px"><col data-vat-column style="width:190px"><col data-vat-column style="width:190px"><col data-vat-column style="width:160px"><col data-vat-column style="width:170px"><col data-vat-column style="width:260px"></colgroup><thead>
 <tr class="journal-group-headings">
 <th scope="colgroup">행</th>
 <th scope="colgroup" colspan="3" class="journal-side-heading">차변</th>
@@ -31,8 +29,16 @@
 <p id="balance-message" role="status" aria-live="polite"></p><button type="submit">전표 저장</button> <a class="btn secondary" href="{% url 'dashboard' %}">취소</a>
 </section></form>
 <style>
+.journal-section-info{display:inline-block;font-size:12px;line-height:1;cursor:help}.journal-section-info:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:50%}
+
+.journal-section-heading{display:flex;align-items:baseline;gap:8px 18px;flex-wrap:wrap;margin-bottom:18px}.journal-section-heading h2{margin:0;flex-shrink:0}
+
 .journal-heading{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
 .journal-heading h1,.journal-heading p{margin:0}
+.journal-heading h1{font-size:24px;font-weight:700;color:#18312e}
+.journal-heading p{font-size:12px;font-weight:400;color:#64756d}
+main{margin-top:18px}.heading{margin-bottom:13px}
+@media(max-width:700px){main{margin-top:12px}.journal-heading h1{font-size:20px}}
 .journal-date-field{display:flex;align-items:center;gap:16px;flex-wrap:wrap;align-self:start}
 .journal-date-field label{margin:0;white-space:nowrap}
 .journal-date-field input[type="date"]{width:220px;max-width:100%}
@@ -43,17 +49,17 @@
 .journal-counterparty-field>.filter{flex:0 0 auto;margin:0!important;gap:8px}
 .journal-counterparty-field>.help-text{flex:1 1 200px;margin:0}
 .journal-counterparty-field>.errorlist{flex-basis:100%}
-.journal-closing-field{grid-column:1/-1;display:grid;grid-template-columns:max-content max-content minmax(0,1fr);align-items:center;gap:10px 20px}
+.journal-closing-field{grid-column:1/-1;display:grid;grid-template-columns:max-content max-content max-content;align-items:center;gap:10px 12px}
 .journal-closing-field>label{grid-column:1;grid-row:1;margin:0}
-.journal-closing-field>.help-text{grid-column:3;grid-row:1;margin:0}
-.journal-closing-field>input{grid-column:2;grid-row:1;justify-self:start;margin:0}
+.journal-closing-field>.closing-info{grid-column:2;grid-row:1}
+.journal-closing-field>input{grid-column:3;grid-row:1;justify-self:start;margin:0}
 .journal-closing-field>.errorlist{grid-column:1/-1}
 @media(min-width:1000px){#journal-form>.panel>.form-grid{grid-template-columns:320px minmax(0,1fr)}}
 .journal-input .journal-group-headings th{text-align:center;font-weight:600}
 .journal-input .journal-field-headings th{text-align:center}
 .journal-input thead th{white-space:nowrap;vertical-align:middle}
 
-.journal-input:not(.vat-visible){width:100%;min-width:1238px}
+.journal-input:not(.vat-visible){width:100%;min-width:1046px}
 .journal-input [hidden]{display:none!important}
 .journal-input .vat-toggle-cell{text-align:center}
 .journal-input [data-vat-fields] :disabled{background-color:#e5e7eb;color:#6b7280;opacity:1;cursor:not-allowed}
@@ -70,12 +76,12 @@
 .journal-scrollbar input:disabled{opacity:.4;cursor:default}
 
 .journal-scroll{width:100%;max-width:100%;max-height:420px;overflow-y:scroll;scrollbar-gutter:stable;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
-.journal-input{width:2638px;min-width:2638px;max-width:none;table-layout:fixed;font-size:13px}
+.journal-input{width:2446px;min-width:2446px;max-width:none;table-layout:fixed;font-size:12px}
 body:has(#journal-form) main{max-width:1480px}
-.journal-input th,.journal-input td{vertical-align:top;white-space:normal;overflow-wrap:anywhere;padding:10px 6px}
-.journal-input input,.journal-input select{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:9px 6px;font-size:13px}
+.journal-input th,.journal-input td{vertical-align:top;white-space:normal;overflow-wrap:anywhere;padding:6px 6px}
+.journal-input input,.journal-input select,.journal-input textarea{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:5px 6px;font-size:12px}
 .journal-input select{margin-top:6px}
-.journal-input input[name$="_code"]{text-align:center;font-variant-numeric:tabular-nums}
+.journal-input input[name$="_code"]{width:calc(5ch + 10px);max-width:100%;padding-left:4px;padding-right:4px;text-align:center;font-variant-numeric:tabular-nums}
 .journal-input input[data-money]{text-align:right;font-variant-numeric:tabular-nums}
 .journal-input .errorlist{white-space:normal}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
@@ -105,4 +111,4 @@ body:has(#journal-form) main{max-width:1480px}
   update();
 })();
 </script>
-{% include 'ledger/journal_row_limit_notice.html' %}{% load static %}<script src="{% static 'ledger/journal_rows.js' %}?v=2"></script><script src="{% static 'ledger/journal_vat_toggle.js' %}?v=8"></script><script src="{% static 'ledger/journal_scroll.js' %}?v=1"></script><script src="{% static 'ledger/journal_accounts.js' %}?v=3"></script>{% include 'ledger/vat_help.html' %}{% endblock %}
+{% include 'ledger/journal_row_limit_notice.html' %}{% load static %}<script src="{% static 'ledger/journal_rows.js' %}?v=2"></script><script src="{% static 'ledger/journal_vat_toggle.js' %}?v=8"></script><script src="{% static 'ledger/journal_columns.js' %}?v=1"></script><script src="{% static 'ledger/journal_scroll.js' %}?v=1"></script><script src="{% static 'ledger/journal_accounts.js' %}?v=4"></script>{% include 'ledger/vat_help.html' %}{% endblock %}

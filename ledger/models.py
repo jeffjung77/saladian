@@ -52,6 +52,57 @@ class ReceiptCreationUsage(models.Model):
     generated_count = models.PositiveIntegerField('사진 비용전표 누적 생성 횟수', default=0)
 
 
+class VoucherQuota(models.Model):
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='voucher_quota')
+    sales_limit = models.PositiveIntegerField('매출전표 생성 한도', null=True, blank=True)
+    expense_limit = models.PositiveIntegerField('비용전표 생성 한도', null=True, blank=True)
+    other_limit = models.PositiveIntegerField('기타전표 생성 한도', null=True, blank=True)
+    photo_limit = models.PositiveIntegerField('사진 비용전표 생성 한도', null=True, blank=True)
+
+
+class VoucherCreationUsage(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    entry_type = models.CharField(max_length=10)
+    generated_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['owner', 'entry_type'], name='unique_voucher_creation_usage')]
+
+
+class NoticeQuerySet(models.QuerySet):
+    def active(self, on_date=None):
+        today = on_date or timezone.localdate()
+        return self.filter(published=True).filter(models.Q(start_date__isnull=True) | models.Q(start_date__lte=today)).filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gte=today))
+
+
+class Notice(models.Model):
+    title = models.CharField('제목', max_length=200)
+    body = models.TextField('내용', max_length=10000)
+    published = models.BooleanField('회원에게 게시', default=False)
+    start_date = models.DateField('게시 시작일', null=True, blank=True)
+    end_date = models.DateField('게시 종료일', null=True, blank=True)
+    objects = NoticeQuerySet.as_manager()
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField('등록일', auto_now_add=True)
+    updated_at = models.DateTimeField('수정일', auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [models.CheckConstraint(condition=models.Q(start_date__isnull=True) | models.Q(end_date__isnull=True) | models.Q(end_date__gte=models.F('start_date')), name='notice_valid_period')]
+
+    @property
+    def publication_status(self):
+        if not self.published:
+            return '비공개'
+        today = timezone.localdate()
+        if self.start_date and self.start_date > today:
+            return '게시 예정'
+        if self.end_date and self.end_date < today:
+            return '기간 종료'
+        return '게시 중'
+
+
 class BoardPost(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='board_posts')
     title = models.CharField('제목', max_length=200)
@@ -64,6 +115,26 @@ class BoardPost(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class CreditAccount(models.Model):
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='credit_account', on_delete=models.PROTECT)
+    balance = models.PositiveBigIntegerField('보유 크레딧', default=0)
+    revision = models.PositiveBigIntegerField(default=0)
+
+
+class CreditTransaction(models.Model):
+    account = models.ForeignKey(CreditAccount, related_name='transactions', on_delete=models.PROTECT)
+    amount = models.BigIntegerField('증감 크레딧')
+    balance_after = models.PositiveBigIntegerField('변경 후 잔액')
+    reason = models.CharField('변경 사유', max_length=300)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='+', on_delete=models.PROTECT)
+    post = models.ForeignKey(BoardPost, null=True, blank=True, on_delete=models.SET_NULL)
+    source_key = models.CharField(max_length=80, unique=True, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
 
 
 class BoardComment(models.Model):
@@ -204,6 +275,24 @@ class Counterparty(models.Model):
         return self.name
 
 
+class OpeningBalanceBatch(models.Model):
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='opening_balance', on_delete=models.PROTECT)
+    start_date = models.DateField('사용 시작일')
+    revision = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='+', on_delete=models.PROTECT)
+
+
+class YearEndClosing(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    year = models.PositiveIntegerField()
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='+', on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['owner', 'year'], name='closing_unique_owner_year')]
+
+
 class Voucher(models.Model):
     class EntryType(models.TextChoices):
         SALES = 'sales', '매출입력'
@@ -217,6 +306,8 @@ class Voucher(models.Model):
 
     date = models.DateField('전표일자', default=timezone.localdate)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name='장부 사용자', related_name='vouchers', on_delete=models.PROTECT, null=True, blank=True)
+    opening_batch = models.ForeignKey(OpeningBalanceBatch, related_name='vouchers', on_delete=models.PROTECT, null=True, blank=True)
+    closing_batch = models.ForeignKey(YearEndClosing, related_name='vouchers', on_delete=models.PROTECT, null=True, blank=True)
     entry_type = models.CharField('입력유형', max_length=10, choices=EntryType.choices, default=EntryType.OTHER)
     kind = models.CharField('구분', max_length=10, choices=Kind.choices)
     account = models.CharField('계정과목', max_length=80)
@@ -239,6 +330,11 @@ class Voucher(models.Model):
     @property
     def is_journal(self):
         return self.kind == self.Kind.JOURNAL
+
+    def get_entry_type_display(self):
+        if self.closing_batch_id:
+            return '차기이월'
+        return '기초잔액' if self.opening_batch_id else dict(self.EntryType.choices).get(self.entry_type, self.entry_type)
 
     @property
     def gross_amount(self):

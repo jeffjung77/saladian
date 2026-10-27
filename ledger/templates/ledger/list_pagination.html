@@ -1,0 +1,7 @@
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px">
+<span class="muted">{{ page.start_index }}–{{ page.end_index }} / {{ page.paginator.count }}건</span>
+{% if page.has_other_pages %}<div style="display:flex;gap:12px;align-items:center">
+{% if page.has_previous %}<a href="{% querystring page=page.previous_page_number %}">이전</a>{% endif %}
+<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>
+{% if page.has_next %}<a href="{% querystring page=page.next_page_number %}">다음</a>{% endif %}
+</div>{% endif %}</div>

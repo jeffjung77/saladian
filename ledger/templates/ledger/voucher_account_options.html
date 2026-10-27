@@ -1,0 +1,1 @@
+{% if field.name == 'account_master' %}<datalist id="voucher-account-options">{% for account in field.field.queryset %}<option value="{{ account }}"></option>{% endfor %}</datalist>{% elif field.name == 'settlement_account' %}<datalist id="voucher-settlement-options">{% for account in field.field.queryset %}<option value="{{ account }}"></option>{% endfor %}</datalist>{% endif %}

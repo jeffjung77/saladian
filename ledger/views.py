@@ -1,3 +1,4 @@
+from .voucher_quota import save_voucher, VoucherQuotaExceeded
 from .models import JournalRowVAT
 from .vat import VAT_FIELDS
 from .excel import report_render
@@ -98,8 +99,11 @@ def counterparties(request):
         partners = partners.filter(Q(name__icontains=query) | Q(business_number__icontains=query) | Q(contact_name__icontains=query) | Q(phone__icontains=query))
     if query.upper().startswith('CP') and query[2:].isascii() and query[2:].isdigit() and len(query[2:]) <= 18:
         partners = Counterparty.objects.filter(owner=request.user, pk=int(query[2:]))
-    page = Paginator(partners, 25).get_page(request.GET.get('page'))
-    return render(request, 'ledger/counterparties.html', {'page': page, 'q': query})
+    per_page = 5 if request.GET.get('per_page') == '5' else 10
+    page = Paginator(partners, per_page).get_page(request.GET.get('page'))
+    return render(request, 'ledger/counterparties.html', {
+        'page': page, 'q': query, 'per_page': per_page,
+        'page_numbers': page.paginator.get_elided_page_range(page.number, on_each_side=2, on_ends=1)})
 
 
 @require_http_methods(['GET', 'POST'])
@@ -129,6 +133,13 @@ def account_ledger(request):
     if form.is_bound and form.is_valid():
         report = reports.account_ledger(form.cleaned_data['account'], form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner=request.user))
     return report_render(request, 'ledger/account_ledger.html', {'form': form, 'report': report})
+
+
+def trial_balance(request):
+    today = timezone.localdate()
+    form = BalanceSheetForm(request.GET if any(key != 'export' for key in request.GET) else {'as_of': today})
+    report = reports.trial_balance(form.cleaned_data['as_of'], vouchers=Voucher.objects.filter(owner=request.user)) if form.is_valid() else None
+    return report_render(request, 'ledger/trial_balance.html', {'form': form, 'report': report})
 
 
 def balance_sheet(request):
@@ -260,6 +271,10 @@ def dashboard(request):
 @require_http_methods(['GET', 'POST'])
 def edit(request, pk=None, entry_type=Voucher.EntryType.OTHER):
     voucher = get_object_or_404(Voucher, pk=pk, owner=request.user) if pk else None
+    if voucher and voucher.closing_batch_id:
+        return render(request, 'ledger/year_end_locked.html', status=403)
+    if voucher and voucher.opening_batch_id:
+        return render(request, 'ledger/opening_balance_locked.html', status=403)
     if (voucher and voucher.is_journal) or (not voucher and entry_type == Voucher.EntryType.OTHER):
         return journal_edit(request, voucher)
     if voucher:
@@ -268,9 +283,14 @@ def edit(request, pk=None, entry_type=Voucher.EntryType.OTHER):
     if request.method == 'POST' and form.is_valid():
         saved = form.save(commit=False)
         saved.owner = request.user
-        saved.save()
+        try:
+            save_voucher(saved)
+        except VoucherQuotaExceeded as exc:
+            form.add_error(None, str(exc))
+            form.quota_popup = str(exc)
+            return render(request, "ledger/form.html", {"form": form, "voucher": voucher, "entry_type": entry_type, "entry_label": dict(Voucher.EntryType.choices)[entry_type]})
         request._audit_target = str(saved.pk)
-        messages.success(request, '전표를 저장했습니다.')
+        messages.success(request, f'전표가 저장되었습니다. 전표번호는 {saved.pk} 번입니다.', extra_tags=f'voucher-saved-popup voucher-entry-{saved.entry_type}')
         return redirect('dashboard')
     labels = dict(Voucher.EntryType.choices)
     return render(request, 'ledger/form.html', {'form': form, 'voucher': voucher, 'entry_type': entry_type, 'entry_label': labels[entry_type]})
@@ -295,30 +315,35 @@ def journal_edit(request, voucher=None):
             form.add_error(None, '부가세 입력 위치가 행별 입력으로 변경되었습니다. 화면을 새로고침한 뒤 분개 행에 입력하세요.')
             header_valid = False
         if header_valid and rows_valid:
-            with transaction.atomic():
-                saved = form.save(commit=False)
-                saved.owner = request.user
-                saved.entry_type = Voucher.EntryType.OTHER
-                saved.kind = Voucher.Kind.JOURNAL
-                saved.account = '복합전표'
-                saved.account_master = None
-                saved.amount = rows.debit_total
-                for name in VAT_FIELDS:
-                    setattr(saved, name, Decimal(0) if name in ('vat_amount', 'vat_deductible') else '')
-                saved.save()
-                request._audit_target = str(saved.pk)
-                saved.journal_lines.all().delete()
-                lines = []
-                for number, row in enumerate(rows, start=1):
-                    for side in ['debit', 'credit']:
-                        if row.cleaned_data.get(f'{side}_account'):
-                            lines.append(JournalLine(voucher=saved, row=number, side=side, account=row.cleaned_data[f'{side}_account'], amount=row.cleaned_data[f'{side}_amount'], memo=row.cleaned_data.get('memo', '')))
-                JournalLine.objects.bulk_create(lines)
-                saved.row_vat.all().delete()
-                JournalRowVAT.objects.bulk_create([JournalRowVAT(voucher=saved, row=number,
-                    **{name: row.cleaned_data.get(name, '') for name in VAT_FIELDS})
-                    for number, row in enumerate(rows, start=1) if row.cleaned_data.get('vat_code')])
-            messages.success(request, '차변·대변 전표를 저장했습니다.')
+            try:
+                with transaction.atomic():
+                    saved = form.save(commit=False)
+                    saved.owner = request.user
+                    saved.entry_type = Voucher.EntryType.OTHER
+                    saved.kind = Voucher.Kind.JOURNAL
+                    saved.account = '복합전표'
+                    saved.account_master = None
+                    saved.amount = rows.debit_total
+                    for name in VAT_FIELDS:
+                        setattr(saved, name, Decimal(0) if name in ('vat_amount', 'vat_deductible') else '')
+                    save_voucher(saved)
+                    request._audit_target = str(saved.pk)
+                    saved.journal_lines.all().delete()
+                    lines = []
+                    for number, row in enumerate(rows, start=1):
+                        for side in ['debit', 'credit']:
+                            if row.cleaned_data.get(f'{side}_account'):
+                                lines.append(JournalLine(voucher=saved, row=number, side=side, account=row.cleaned_data[f'{side}_account'], amount=row.cleaned_data[f'{side}_amount'], memo=row.cleaned_data.get('memo', '')))
+                    JournalLine.objects.bulk_create(lines)
+                    saved.row_vat.all().delete()
+                    JournalRowVAT.objects.bulk_create([JournalRowVAT(voucher=saved, row=number,
+                        **{name: row.cleaned_data.get(name, '') for name in VAT_FIELDS})
+                        for number, row in enumerate(rows, start=1) if row.cleaned_data.get('vat_code')])
+            except VoucherQuotaExceeded as exc:
+                form.add_error(None, str(exc))
+                form.quota_popup = str(exc)
+                return render(request, "ledger/journal_form.html", {"form": form, "rows": rows, "voucher": voucher, "entry_type": "other", "visible_rows": 5})
+            messages.success(request, f'전표가 저장되었습니다. 전표번호는 {saved.pk} 번입니다.', extra_tags='voucher-saved-popup voucher-entry-other')
             return redirect('dashboard')
     visible_rows = max([1] + [number for number, initial_row in enumerate(initial, start=1) if initial_row])
     if request.method == 'POST':
@@ -335,6 +360,10 @@ def journal_edit(request, voucher=None):
 @require_http_methods(['GET', 'POST'])
 def delete(request, pk):
     voucher = get_object_or_404(Voucher, pk=pk, owner=request.user)
+    if voucher.closing_batch_id:
+        return render(request, 'ledger/year_end_locked.html', status=403)
+    if voucher.opening_batch_id:
+        return render(request, 'ledger/opening_balance_locked.html', status=403)
     if request.method == 'POST':
         voucher.delete()
         messages.success(request, '전표를 삭제했습니다.')

@@ -136,7 +136,7 @@ class AccountMasterTests(AuthenticatedLedgerTestCase):
         self.assertContains(self.client.get(reverse('voucher_new')), '5001 · 매출-용역')
 
     def test_create_only_registered_accounts(self):
-        for invalid in ['', '9999', '매출', '5001 · 매출-용역']:
+        for invalid in ['', '9999', '매출', '5001 · 잘못된 계정명']:
             response = self.client.post(reverse('sales_new'), self.data(invalid))
             self.assertEqual(response.status_code, 200)
             self.assertIn('account_master', response.context['form'].errors)
@@ -145,6 +145,18 @@ class AccountMasterTests(AuthenticatedLedgerTestCase):
         voucher = Voucher.objects.get()
         self.assertEqual(voucher.account_master_id, '5001')
         self.assertEqual(voucher.account, '매출-용역')
+
+    def test_typed_account_names_and_labels(self):
+        data = self.data('매출-용역')
+        data['settlement_account'] = '현금'
+        self.assertEqual(self.client.post(reverse('sales_new'), data).status_code, 302)
+        saved = Voucher.objects.get()
+        self.assertEqual((saved.account_master_id, saved.settlement_account_id), ('5001', '1101'))
+        data['account_master'] = '6505 · 임차료'
+        data['settlement_account'] = '1102 · 예금'
+        self.assertEqual(self.client.post(reverse('expense_new'), data).status_code, 302)
+        saved = Voucher.objects.get(entry_type='expense')
+        self.assertEqual((saved.account_master_id, saved.settlement_account_id), ('6505', '1102'))
 
     def test_duplicate_names_are_distinguished_by_code(self):
         for code in ['3202', '3302']:
@@ -301,17 +313,17 @@ class JournalTests(AuthenticatedLedgerTestCase):
 
     def test_line_memo_validation_and_invalid_edit_preserves_memos(self):
         data = journal_data()
-        data['lines-0-memo'] = '가' * 1000
+        data['lines-0-memo'] = '가' * 50
         self.assertRedirects(self.client.post(reverse('voucher_new'), data), reverse('dashboard'))
         voucher = Voucher.objects.get()
         url = reverse('voucher_edit', args=[voucher.pk])
-        for field, value in [('lines-0-memo', '가' * 1001), ('lines-4-memo', '적요만 입력')]:
+        for field, value in [('lines-0-memo', '가' * 51), ('lines-4-memo', '적요만 입력')]:
             invalid = dict(data)
             invalid[field] = value
             response = self.client.post(url, invalid)
             self.assertEqual(response.status_code, 200)
             self.assertFalse(response.context['rows'].is_valid())
-            self.assertEqual(voucher.journal_lines.get(side='debit').memo, '가' * 1000)
+            self.assertEqual(voucher.journal_lines.get(side='debit').memo, '가' * 50)
             self.assertEqual(voucher.journal_lines.count(), 2)
 
     def test_all_five_memos_remain_distinct_and_html_is_escaped(self):

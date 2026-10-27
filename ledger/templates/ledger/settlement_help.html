@@ -1,0 +1,7 @@
+<div class="settlement-label-row">
+<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+<span class="settlement-help"><button type="button" class="settlement-info" aria-label="상대계정 안내" aria-describedby="settlement-help-text">ⓘ</button><span id="settlement-help-text" class="settlement-tooltip" role="tooltip">{{ field.help_text }}</span></span>
+</div>
+<style>
+.settlement-label-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;position:relative}.settlement-label-row>label{margin:0}.settlement-info{background:transparent;color:var(--muted);border:0;padding:0;font-size:12px;line-height:1;cursor:help;vertical-align:middle}.settlement-info:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:50%}.settlement-tooltip{display:none;position:absolute;left:0;top:100%;margin-top:6px;width:100%;padding:10px 12px;background:white;border:1px solid var(--line);border-radius:8px;box-shadow:0 5px 18px #18312e26;font-size:14px;font-weight:400;line-height:1.6;z-index:30}.settlement-help:hover .settlement-tooltip,.settlement-help:focus-within .settlement-tooltip{display:block}
+</style>

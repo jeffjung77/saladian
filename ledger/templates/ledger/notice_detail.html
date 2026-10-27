@@ -1,0 +1,4 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><h1>공지사항</h1><a class="btn secondary" href="{% url 'board_list' %}">게시판</a></div>
+<article class="panel"><h2 style="overflow-wrap:anywhere">{{ notice.title }}</h2><p class="muted">{{ notice.created_at|date:'Y-m-d H:i' }}{% if not notice.published %} · 비공개{% endif %}</p><div style="white-space:pre-wrap;overflow-wrap:anywhere">{{ notice.body }}</div></article>{% if user.is_superuser %}<a class="btn secondary" href="{% url 'notice_edit' notice.pk %}">수정</a>{% endif %}
+{% endblock %}

@@ -128,8 +128,11 @@ class CounterpartySelectionMixin:
 
 
 class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
-    account_master = forms.ModelChoiceField(label='계정과목', queryset=Account.objects.all(), empty_label='계정코드 · 계정과목을 선택하세요')
-    settlement_account = forms.ModelChoiceField(label='상대계정', queryset=Account.objects.filter(element__in=['자산', '부채', '자본']), empty_label='현금·예금·외상계정 등을 선택하세요', help_text='수입은 상대계정 차변 / 선택 계정과목 대변, 지출은 선택 계정과목 차변 / 상대계정 대변으로 재무제표에 반영합니다.')
+    memo = forms.CharField(label='적요', required=False, max_length=200,
+        widget=forms.Textarea(attrs={'rows': 3, 'maxlength': 200, 'placeholder': '거래 내용을 입력하세요 (최대 200자)', 'style': 'resize:vertical'}))
+    vat_enabled = forms.BooleanField(label='부가세 입력', required=False)
+    account_master = AccountEntryField(label='계정과목', queryset=Account.objects.all(), widget=forms.TextInput(attrs={'autocomplete': 'off', 'placeholder': '계정코드 또는 계정과목명 직접 입력', 'list': 'voucher-account-options'}))
+    settlement_account = AccountEntryField(label='상대계정', queryset=Account.objects.filter(element__in=['자산', '부채', '자본']), widget=forms.TextInput(attrs={'autocomplete': 'off', 'placeholder': '계정코드 또는 계정과목명 직접 입력', 'list': 'voucher-settlement-options'}), help_text='수입은 상대계정 차변 / 선택 계정과목 대변, 지출은 선택 계정과목 차변 / 상대계정 대변으로 재무제표에 반영합니다.')
 
     def __init__(self, *args, entry_type=Voucher.EntryType.OTHER, **kwargs):
         super().__init__(*args, **kwargs)
@@ -146,6 +149,8 @@ class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
             self.fields['kind'].initial = Voucher.Kind.EXPENSE
             self.fields['kind'].disabled = True
         if entry_type in (Voucher.EntryType.SALES, Voucher.EntryType.EXPENSE):
+            self.order_fields(['date', 'kind', 'counterparty', 'settlement_account', 'account_master', 'amount', 'memo', 'vat_enabled'] + VAT_FIELDS)
+            self.fields['kind'].widget = forms.HiddenInput()
             self.initial['kind'] = self.fields['kind'].initial
             self.fields['vat_trade'].initial = 'S' if entry_type == Voucher.EntryType.SALES else 'P'
             self.initial['vat_trade'] = self.fields['vat_trade'].initial
@@ -157,6 +162,12 @@ class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
             self.fields[name].queryset = self.fields[name].queryset.filter(pk__in=allowed)
         if not self.instance.pk and not self.fields['account_master'].queryset.filter(pk=self.initial.get('account_master')).exists():
             self.initial.pop('account_master', None)
+        if not self.is_bound:
+            self.initial['vat_enabled'] = any(self.initial.get(name) for name in VAT_FIELDS if name != 'vat_trade')
+        elif self.data.get('_vat_toggle_present') == '1' and not self.fields['vat_enabled'].to_python(self.data.get('vat_enabled')):
+            for name in VAT_FIELDS:
+                self.fields[name].disabled = True
+                self.initial[name] = 0 if name in ('vat_amount', 'vat_deductible') else ''
 
     def save(self, commit=True):
         voucher = super().save(commit=False)
@@ -189,6 +200,8 @@ class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
 
 
 class JournalHeaderForm(CounterpartySelectionMixin, forms.ModelForm):
+    memo = forms.CharField(label='적요', required=False, max_length=50,
+        widget=forms.Textarea(attrs={'rows': 1, 'maxlength': 50, 'placeholder': '거래 내용을 입력하세요 (최대 50자)', 'style': 'resize:vertical'}))
     class Meta:
         model = Voucher
         fields = ['date', 'counterparty', 'memo', 'is_closing']
@@ -221,6 +234,7 @@ class JournalRowForm(VatFormMixin, forms.Form):
         for side in ('debit', 'credit'):
             name = f'{side}_account'
             self.fields[name].queryset = selectable_accounts(user, [self.initial.get(name)])
+            self.fields[name].account_code = self.data.get(self.add_prefix(f'{side}_code'), '') if self.is_bound else ''
             self.fields[name].widget.attrs['list'] = f'{self.prefix}-{side}-suggestions'
             if not self.is_bound and self.initial.get(name):
                 account = self.fields[name].queryset.filter(pk=self.initial[name]).first()
@@ -231,11 +245,12 @@ class JournalRowForm(VatFormMixin, forms.Form):
     debit_name = forms.CharField(label='차변 계정과목명 검색', max_length=100, required=False, widget=forms.TextInput(attrs={'placeholder': '계정과목명 직접 입력', 'autocomplete': 'off'}))
     credit_code = forms.CharField(label='대변 계정코드', max_length=4, required=False, widget=forms.TextInput(attrs={'inputmode': 'numeric', 'placeholder': '계정코드'}))
     credit_name = forms.CharField(label='대변 계정과목명 검색', max_length=100, required=False, widget=forms.TextInput(attrs={'placeholder': '계정과목명 직접 입력', 'autocomplete': 'off'}))
-    debit_account = AccountEntryField(label='차변 계정과목', queryset=Account.objects.all(), required=False, widget=forms.TextInput(attrs={'autocomplete': 'off', 'placeholder': '계정코드 또는 계정과목명 직접 입력'}))
+    debit_account = AccountEntryField(label='차변 계정과목', queryset=Account.objects.all(), required=False, widget=forms.TextInput(attrs={'autocomplete': 'off', 'placeholder': '계정과목명 직접 입력'}))
     debit_amount = forms.DecimalField(label='차변 금액', required=False, min_value=1, max_digits=14, decimal_places=0, widget=MoneyInput(attrs={'min': 1, 'step': 1}))
-    credit_account = AccountEntryField(label='대변 계정과목', queryset=Account.objects.all(), required=False, widget=forms.TextInput(attrs={'autocomplete': 'off', 'placeholder': '계정코드 또는 계정과목명 직접 입력'}))
+    credit_account = AccountEntryField(label='대변 계정과목', queryset=Account.objects.all(), required=False, widget=forms.TextInput(attrs={'autocomplete': 'off', 'placeholder': '계정과목명 직접 입력'}))
     credit_amount = forms.DecimalField(label='대변 금액', required=False, min_value=1, max_digits=14, decimal_places=0, widget=MoneyInput(attrs={'min': 1, 'step': 1}))
-    memo = forms.CharField(label='라인 적요', required=False, max_length=1000, widget=forms.TextInput(attrs={'placeholder': '이 행의 공통 거래 내용 (선택)'}))
+    memo = forms.CharField(label='라인 적요', required=False, max_length=50,
+        widget=forms.Textarea(attrs={'rows': 1, 'maxlength': 50, 'placeholder': '이 행의 공통 거래 내용 (최대 50자)', 'style': 'resize:vertical'}))
 
     def clean(self):
         data = super().clean()

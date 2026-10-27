@@ -1,0 +1,11 @@
+{% extends 'ledger/base.html' %}{% load humanize %}{% block content %}
+<div class="heading"><h1>차기이월</h1><p class="muted">연말 손익계정 잔액을 3403 미처분이익잉여금(또는 미처리결손금)으로 대체합니다.</p></div>
+<section class="panel"><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit" name="action" value="preview">분개 미리보기</button></form>
+<p class="muted">본인 장부를 대상으로 12월 31일자 결산전표를 생성합니다. 원래 매출·비용 전표와 연말 손익계산서는 유지되며, 다음 연도의 손익계정 기초잔액은 0원이 됩니다. 자산·부채·자본은 기존 장부에서 계속 누적됩니다.</p></section>
+{% if result %}<section class="panel"><h2>{{ form.cleaned_data.year }}년 차기이월 분개 미리보기</h2>
+<p>이월할 순손익: <strong>{{ result.net_profit|intcomma }}원</strong> (손실은 음수)</p>
+{% if result.existing %}<p class="notice">이미 이월한 연도입니다. 실행하면 해당 연도의 자동 차기이월 전표만 교체합니다. 일반 전표는 유지됩니다.</p>{% endif %}
+<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>계정코드</th><th>계정과목</th><th class="num">차변(원)</th><th class="num">대변(원)</th></tr></thead><tbody>{% for row in result.entries %}<tr><td>{{ row.account.code }}</td><td>{{ row.account.name }}</td><td class="num">{{ row.debit|intcomma }}</td><td class="num">{{ row.credit|intcomma }}</td></tr>{% endfor %}</tbody><tfoot><tr><th colspan="2">합계</th><th class="num">{{ result.debit|intcomma }}</th><th class="num">{{ result.credit|intcomma }}</th></tr></tfoot></table></div>
+<p>차변·대변 합계 일치 확인 완료. 아래 버튼을 눌러야 장부에 저장됩니다.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="year" value="{{ form.cleaned_data.year }}"><input type="hidden" name="token" value="{{ token }}"><button name="action" value="execute" type="submit">연말 차기이월을 수행할까요?</button></form></section>{% endif %}
+{% endblock %}

@@ -1,0 +1,4 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<section class="panel auth-panel"><h1>처음 사용 설정</h1><p>이 PC에서 사용할 계정을 만드세요. 장부와 영수증 사진은 이 PC에 저장됩니다.</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">쉬운장부 시작하기</button></form></section>
+{% endblock %}

@@ -1,0 +1,7 @@
+<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px">
+<span class="muted">{{ page.start_index }}–{{ page.end_index }} / {{ page.paginator.count }}개</span>
+{% if page.has_other_pages %}<nav aria-label="거래처 목록 페이지" style="padding:0;margin:0;gap:8px">
+{% if page.has_previous %}<a href="?q={{ q|urlencode }}&amp;per_page={{ per_page }}&amp;page={{ page.previous_page_number }}">이전</a>{% endif %}
+{% for number in page_numbers %}{% if number == page.paginator.ELLIPSIS %}<span>{{ number }}</span>{% elif number == page.number %}<strong aria-current="page">{{ number }}</strong>{% else %}<a href="?q={{ q|urlencode }}&amp;per_page={{ per_page }}&amp;page={{ number }}">{{ number }}</a>{% endif %}{% endfor %}
+{% if page.has_next %}<a href="?q={{ q|urlencode }}&amp;per_page={{ per_page }}&amp;page={{ page.next_page_number }}">다음</a>{% endif %}
+</nav>{% endif %}</div>

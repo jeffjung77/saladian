@@ -1,0 +1,1 @@
+{% extends 'ledger/base.html' %}{% block content %}<section class="panel auth-panel"><h1>로그인</h1><p>이 PC에 등록한 계정으로 로그인하세요.</p><form method="post">{% csrf_token %}{{ form.as_p }}<input type="hidden" name="next" value="{{ next }}"><button class="auth-submit">로그인</button></form></section>{% endblock %}

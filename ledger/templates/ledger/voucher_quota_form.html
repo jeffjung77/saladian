@@ -1,0 +1,7 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><h1>전표 생성 한도 설정</h1></div>
+<section class="panel"><h2>회원아이디: {{ member.username }}</h2>
+<p class="muted">각 한도는 누적 생성 건수 기준입니다. 빈칸은 제한 없음, 0은 신규 생성 불가입니다. 전표를 삭제해도 사용 횟수는 복구되지 않습니다. 사진 비용전표는 비용전표 한도와 사진 한도를 모두 적용합니다. 기존 전표 수정은 가능합니다.</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">한도 저장</button> <a class="btn secondary" href="{% url 'user_voucher_counts' %}">취소</a></form>
+<h2>누적 생성 현황</h2>{% for item in usage %}<p>{{ item.label }}: {{ item.count }}건</p>{% endfor %}<p class="muted">기능 적용 이전의 횟수는 기존 보관 전표를 기준으로 반영합니다.</p></section>
+{% endblock %}

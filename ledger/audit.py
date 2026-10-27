@@ -9,6 +9,11 @@ ACTIONS = [('view', '조회'), ('create', '등록'), ('update', '수정'), ('del
            ('login', '로그인'), ('logout', '로그아웃')]
 RESULTS = [('success', '성공'), ('invalid', '입력 오류'), ('denied', '권한 없음'), ('error', '오류')]
 RESOURCES = {
+    'credit_list': '사용자별 크레딧 현황', 'credit_edit': '사용자 크레딧 변경',
+    'year_end': '차기이월',
+    'opening_balances': '기초잔액 올리기',
+    'voucher_quota_edit': '전표 생성 한도 설정', 'user_voucher_counts': '사용자별 전표 수 관리', 'notice_management': '공지사항 관리',
+    'notice_new': '공지사항', 'notice_edit': '공지사항', 'notice_delete': '공지사항', 'notice_detail': '공지사항',
     'login': '로그인', 'logout': '로그아웃', 'signup': '회원가입', 'system_signup': '회원등록',
     'member_profile': '비밀번호 변경', 'member_registration': '사용등록', 'member_grade': '회원등급',
     'member_list': '회원현황', 'subscription_list': '구독관리', 'subscription_edit': '구독정보',
@@ -17,14 +22,14 @@ RESOURCES = {
     'voucher_edit': '전표', 'voucher_delete': '전표', 'counterparties': '거래처관리',
     'counterparty_new': '거래처', 'counterparty_edit': '거래처', 'counterparty_certificate': '사업자등록증 다운로드',
     'accounts': '계정과목표', 'account_new': '계정과목', 'account_status': '계정 사용 여부',
-    'balance_sheet': '대차대조표', 'income_statement': '손익계산서', 'account_ledger': '계정별원장',
+    'trial_balance': '합계잔액 시산표', 'balance_sheet': '대차대조표', 'income_statement': '손익계산서', 'account_ledger': '계정별원장',
     'partner_ledger': '거래처별원장', 'audit_logs': '로그조회',
     'company_list': '업체관리', 'company_detail': '업체현황 조회',
     'board_list': '게시판', 'board_detail': '게시글 조회', 'board_new': '게시글',
     'board_edit': '게시글', 'board_delete': '게시글',
     'board_comment_new': '게시판 댓글', 'board_comment_delete': '게시판 댓글',
 }
-CREATE_VIEWS = {'signup', 'system_signup', 'sales_new', 'expense_new', 'voucher_new', 'counterparty_new', 'account_new', 'board_new', 'board_comment_new'}
+CREATE_VIEWS = {'signup', 'system_signup', 'sales_new', 'expense_new', 'voucher_new', 'counterparty_new', 'account_new', 'board_new', 'board_comment_new', 'notice_new'}
 
 
 def company_name(user):
@@ -89,7 +94,7 @@ class AuditMiddleware:
         if name == 'company_detail' and user.is_superuser:
             owner = get_user_model().objects.filter(pk=view_kwargs.get('company_id')).first() or user
         if pk:
-            if name in ('subscription_edit', 'member_grade') and user.is_superuser:
+            if name in ('subscription_edit', 'member_grade', 'voucher_quota_edit') and user.is_superuser:
                 if name == 'subscription_edit':
                     item = Subscription.objects.select_related('user').filter(pk=pk).first()
                     owner = item.user if item else user

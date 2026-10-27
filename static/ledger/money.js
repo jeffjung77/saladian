@@ -17,6 +17,14 @@
     }
   };
   document.querySelectorAll('input[data-money]').forEach(format);
+  document.addEventListener('beforeinput', event => {
+    const input = event.target;
+    if (input.matches('input[data-money]') && !input.disabled && !input.readOnly &&
+        input.value.replace(/,/g, '') === '0' && event.inputType.startsWith('insert')) {
+      input.value = '';
+      input.setSelectionRange(0, 0);
+    }
+  }, true);
   document.addEventListener('input', event => {
     if (event.target.matches('input[data-money]') && !event.isComposing) format(event.target);
   }, true);

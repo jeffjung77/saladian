@@ -1,0 +1,50 @@
+{% if popup_notices %}
+<dialog id="published-notice-popup" aria-labelledby="published-notice-title">
+<h2 id="published-notice-title">BPMS 쉬운장부 공지사항</h2>
+<div class="published-notice-content">{% for notice in popup_notices %}
+<article data-notice-version="{{ notice.pk }}:{{ notice.updated_at|date:'c' }}"><h3>{{ notice.title }}</h3><p class="muted">{{ notice.created_at|date:'Y-m-d H:i' }}</p><div class="published-notice-body">{{ notice.body }}</div><p><a href="{% url 'notice_detail' notice.pk %}">공지 자세히 보기</a></p></article>
+{% endfor %}</div>
+<form method="dialog" style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px">
+<button type="button" class="secondary" data-notice-snooze="today">오늘 그만보기</button>
+<button type="button" class="secondary" data-notice-snooze="week">1주일간 보지 않기</button>
+<button autofocus>확인</button></form>
+</dialog>
+<style>#published-notice-popup{width:calc(100% - 32px);max-width:640px;max-height:85vh;padding:20px;border:1px solid var(--line);border-radius:12px;color:var(--ink);background:white}#published-notice-popup::backdrop{background:#0006}.published-notice-content{max-height:60vh;overflow:auto}.published-notice-content article+article{border-top:1px solid var(--line);margin-top:14px;padding-top:14px}.published-notice-body{white-space:pre-wrap;overflow-wrap:anywhere}@media print{#published-notice-popup{display:none}}</style>
+{{ notice_popup_cycle|json_script:'notice-popup-cycle' }}
+{{ notice_snooze_config|json_script:'notice-snooze-config' }}
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+ const popup = document.getElementById('published-notice-popup');
+ const key = 'bpms-notices:' + JSON.parse(document.getElementById('notice-popup-cycle').textContent);
+ const version = Array.from(popup.querySelectorAll('[data-notice-version]')).map(item => item.dataset.noticeVersion).join('|');
+ const config = JSON.parse(document.getElementById('notice-snooze-config').textContent);
+ const snoozeKey = 'bpms-notice-snooze:' + config.user;
+ const snoozed = () => {
+  try {
+   const value = JSON.parse(localStorage.getItem(snoozeKey));
+   return value && value.version === version && Number(value.until) > Date.now();
+  } catch (_) {return false;}
+ };
+ if (snoozed()) return;
+ let seen = false;
+ try {seen = sessionStorage.getItem(key) === version;} catch (_) {}
+ if (seen) return;
+ const markSeen = () => {try {sessionStorage.setItem(key, version);} catch (_) {}};
+ popup.querySelectorAll('[data-notice-snooze]').forEach(button => button.addEventListener('click', () => {
+  const until = button.dataset.noticeSnooze === 'today' ? config.todayUntil : Date.now() + 7 * 24 * 60 * 60 * 1000;
+  try {localStorage.setItem(snoozeKey, JSON.stringify({until, version}));} catch (_) {}
+  popup.close();
+ }));
+ popup.addEventListener('close', markSeen, {once:true});
+ popup.querySelectorAll('a').forEach(link => link.addEventListener('click', markSeen));
+ // Wait for save-confirmation dialogs instead of stacking modal windows.
+ const show = () => {
+  if (snoozed()) return;
+  const other = document.querySelector('dialog[open]');
+  if (other) other.addEventListener('close', show, {once:true});
+  else popup.showModal();
+ };
+ show();
+}, {once:true});
+</script>
+{% endif %}

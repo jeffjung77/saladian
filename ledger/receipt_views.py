@@ -1,3 +1,4 @@
+from .voucher_quota import limits_for, VoucherQuotaExceeded
 import warnings
 from datetime import timedelta
 from pathlib import PurePosixPath
@@ -105,7 +106,7 @@ def receipt_history(request):
     return render(request, 'ledger/receipt_history.html', {
         'page': page, 'page_numbers': page.paginator.get_elided_page_range(page.number, on_each_side=2, on_ends=1),
         'status': status, 'statuses': ReceiptPhoto.Status.choices,
-        'receipt_limited': is_limited(request.user), 'receipt_remaining': remaining_creations(request.user)})
+        'receipt_limit': limits_for(request.user)['photo'], 'receipt_limited': is_limited(request.user), 'receipt_remaining': remaining_creations(request.user)})
 
 
 @never_cache
@@ -151,7 +152,9 @@ def receipt_analyze(request, pk):
     try:
         text = recognize_receipt(item.photo, on_request=lambda: VisionUsage.objects.filter(pk=usage.pk).update(api_attempted=True))
     except DefaultCredentialsError:
-        error = 'Google 인증을 찾을 수 없습니다. 개발환경의 Google 인증 설정을 확인하세요.'
+        from django.conf import settings
+        error = ('Google 인증을 찾을 수 없습니다. 쉬운장부 실행창의 Google Vision 설정에서 본인의 인증파일을 선택하세요.'
+                 if getattr(settings, 'DESKTOP_MODE', False) else 'Google 인증을 찾을 수 없습니다. 개발환경의 Google 인증 설정을 확인하세요.')
     except PermissionDenied:
         error = 'Google Vision 접근 권한 또는 API·결제 활성화 상태를 확인하세요.'
     except ResourceExhausted:
@@ -194,8 +197,11 @@ def receipt_expense(request, pk):
     if request.method == 'POST' and form.is_valid():
         try:
             saved = create_receipt_voucher(item, request.user, form)
+        except VoucherQuotaExceeded as exc:
+            form.add_error(None, str(exc))
+            form.quota_popup = str(exc)
         except ReceiptQuotaExceeded:
-            form.add_error(None, '사용자 등급의 사진 비용전표 생성은 누적 10회까지 가능합니다. 남은 횟수: 0/10')
+            form.add_error(None, f'사진 비용전표 생성 한도({limits_for(request.user)["photo"]}회)에 도달했습니다. 남은 횟수: 0/{limits_for(request.user)["photo"]}. 시스템관리자에게 문의하세요.')
         else:
             if saved:
                 request._audit_target = saved.pk

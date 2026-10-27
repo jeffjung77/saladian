@@ -1,14 +1,18 @@
 {% extends 'ledger/base.html' %}{% load humanize %}{% block content %}
 <style>
-.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.overview-grid .panel{min-width:0}.overview-chart{display:block;width:100%;height:240px}.overview-summary{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}.overview-summary strong{font-size:28px}.overview-links{display:flex;gap:10px;flex-wrap:wrap}.overview-note{font-size:13px}@media(max-width:800px){.overview-grid{grid-template-columns:1fr}}
+.overview-metrics .card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.overview-metrics .card strong{display:inline;margin-top:0;overflow-wrap:anywhere;min-width:0}
+
+.overview-page-heading{display:flex;align-items:baseline;gap:8px 18px;flex-wrap:wrap}.heading .overview-page-heading p{margin:0}
+
+.overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;align-items:stretch}.overview-grid .panel{min-width:0;padding:16px}.overview-grid table{white-space:normal;overflow-wrap:anywhere}.overview-grid td,.overview-grid th{padding:12px 8px}.overview-chart{display:block;width:100%;height:240px}.overview-summary{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}.overview-summary strong{font-size:28px}.overview-links{display:flex;gap:10px;flex-wrap:wrap}.overview-note{font-size:13px}@media(max-width:800px){.overview-grid{grid-template-columns:1fr}}
 </style>
-<div class="heading"><div><h1>사업현황 한눈에 보기</h1><p class="muted">{{ today|date:'Y년 m월 d일' }} 기준 · 내 장부의 현금, 손익, 재무상태를 확인하세요.</p></div><a class="btn" href="{% url 'sales_new' %}">+ 매출입력</a></div>
-<div class="cards">
+<div class="heading"><div class="overview-page-heading"><h1>사업현황 한눈에 보기</h1><p class="muted">{{ today|date:'Y년 m월 d일' }} 기준 · 내 장부의 현금, 손익, 재무상태를 확인하세요.</p></div></div>
+<div class="cards overview-metrics">
 <div class="card"><span class="muted">현금·예금 합계잔액</span><strong>{{ cash_total|intcomma }}원</strong></div>
 <div class="card"><span class="muted">이번 달 순이익</span><strong class="{% if income.net_profit < 0 %}expense{% else %}income{% endif %}">{{ income.net_profit|intcomma }}원</strong></div>
 <div class="card"><span class="muted">현재 자산총계</span><strong>{{ balance.assets|intcomma }}원</strong></div>
 </div>
-{% if guest_preview %}<div class="notice">로그인 전 미리보기입니다. 표시된 0원은 예시이며, 로그인하면 본인의 장부가 표시됩니다. 메뉴나 매출입력을 클릭하면 로그인 화면으로 이동합니다.</div>{% elif not balance.included_count %}<div class="notice">집계할 전표가 없습니다. 전표를 입력하면 그래프와 재무상태가 표시됩니다.</div>{% endif %}
+{% if guest_preview %}<div class="notice">로그인 전 미리보기입니다. 표시된 0원은 예시이며, 로그인하면 본인의 장부가 표시됩니다. 메뉴를 클릭하면 로그인 화면으로 이동합니다.</div>{% elif not balance.included_count %}<div class="notice">집계할 전표가 없습니다. 전표를 입력하면 그래프와 재무상태가 표시됩니다.</div>{% endif %}
 {% if balance.excluded %}<div class="notice">분개 정보 확인이 필요한 전표 {{ balance.excluded|length }}건은 집계에서 제외했습니다. <a href="{% url 'balance_sheet' %}?as_of={{ today|date:'Y-m-d' }}">대차대조표에서 확인하기</a></div>{% endif %}
 <div class="overview-grid">
 <section class="panel"><h2>현금계정 합계잔액 그래프</h2><p class="muted">{{ start|date:'m월 d일' }} ~ {{ today|date:'m월 d일' }} · 일별 마감잔액</p>
@@ -21,10 +25,10 @@
 <table><tbody><tr><th>수익 합계</th><td class="num">{{ revenue|intcomma }}원</td></tr><tr><th>비용 합계</th><td class="num">{{ expense|intcomma }}원</td></tr><tr><th>당기순이익(손실)</th><td class="num">{{ income.net_profit|intcomma }}원</td></tr></tbody></table>
 <p class="muted overview-note">수익은 매출액·영업외수익, 비용은 매출원가·판매관리비·영업외비용·법인세비용입니다. 손익대체 결산전표 {{ income.closing_count }}건은 제외합니다.</p>
 <a href="{% url 'income_statement' %}?start={{ start|date:'Y-m-d' }}&amp;end={{ today|date:'Y-m-d' }}">이번 달 손익계산서 자세히 보기 →</a></section>
-</div>
 <section class="panel"><div class="overview-summary"><h2>현재의 요약대차대조표</h2><span class="muted">{{ today|date:'Y.m.d' }} 기준</span></div>
 <div class="table-wrap"><table><thead><tr><th>구분</th><th class="num">금액(원)</th></tr></thead><tbody><tr><th>자산총계</th><td class="num">{{ balance.assets|intcomma }}</td></tr><tr><th>부채총계</th><td class="num">{{ balance.liabilities|intcomma }}</td></tr><tr><th>자본총계</th><td class="num">{{ balance.equity|intcomma }}</td></tr><tr><th>부채 및 자본총계</th><td class="num">{{ balance.liabilities_equity|intcomma }}</td></tr><tr><th>대차 차액</th><td class="num">{{ balance.difference|intcomma }} {% if not balance.difference %}(일치){% endif %}</td></tr></tbody></table></div>
 <p class="muted overview-note">자본에는 미결산 누적손익 {{ balance.unclosed_profit|intcomma }}원이 포함됩니다. 기초잔액과 필요한 조정은 기타전표로 입력하세요.</p><a href="{% url 'balance_sheet' %}?as_of={{ today|date:'Y-m-d' }}">대차대조표 자세히 보기 →</a></section>
+</div>
 {{ cash_points|json_script:'cash-data' }}{{ profit_points|json_script:'profit-data' }}
 <script>
 (() => {

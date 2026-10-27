@@ -1,0 +1,13 @@
+{% extends 'ledger/base.html' %}{% load humanize %}{% block content %}
+<style>.trial-heading{display:flex;align-items:baseline;gap:8px 18px;flex-wrap:wrap}.heading .trial-heading p{margin:0}.trial-table{font-size:12px}</style>
+<div class="heading"><div class="trial-heading"><h1>합계잔액 시산표</h1><p class="muted">기준일까지의 계정별 차변·대변 합계와 잔액을 확인하세요.</p></div></div>
+{% include 'ledger/report_header.html' %}
+{% if report %}
+<h2>{{ form.cleaned_data.as_of|date:'Y년 m월 d일' }} 기준</h2>
+{% include 'ledger/report_status.html' %}
+<section class="panel"><p class="muted">기초잔액과 결산전표를 포함한 누적 금액입니다. 거래가 있는 계정과목을 표시합니다.</p>
+<div class="table-wrap"><table class="trial-table"><thead><tr><th class="num">차변 잔액</th><th class="num">차변 합계</th><th>계정코드</th><th>계정과목</th><th class="num">대변 합계</th><th class="num">대변 잔액</th></tr></thead><tbody>
+{% for row in report.rows %}<tr><td class="num">{{ row.debit_balance|intcomma }}</td><td class="num">{{ row.debit|intcomma }}</td><td>{{ row.account.code }}</td><td>{{ row.account.name }}</td><td class="num">{{ row.credit|intcomma }}</td><td class="num">{{ row.credit_balance|intcomma }}</td></tr>{% empty %}<tr><td colspan="6">조회할 전표가 없습니다.</td></tr>{% endfor %}
+</tbody><tfoot><tr><th class="num">{{ report.totals.debit_balance|intcomma }}</th><th class="num">{{ report.totals.debit|intcomma }}</th><th colspan="2">합계 (원)</th><th class="num">{{ report.totals.credit|intcomma }}</th><th class="num">{{ report.totals.credit_balance|intcomma }}</th></tr></tfoot></table></div>
+<p>합계 차액: {{ report.difference|intcomma }}원 · 잔액 차액: {{ report.balance_difference|intcomma }}원 {% if not report.difference and not report.balance_difference %}(차변·대변 일치){% endif %}</p></section>
+{% endif %}{% endblock %}

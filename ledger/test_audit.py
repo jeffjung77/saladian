@@ -84,7 +84,7 @@ class AuditTests(AuthenticatedLedgerTestCase):
             AuditLog.objects.create(actor=self.user, actor_name=self.user.username, company_name='페이지 업체', action='view',
                 resource='테스트', method='GET', status_code=200, result='success', path='/test/')
         response = self.client.get(reverse('audit_logs'), {'company': '페이지 업체', 'page': 2})
-        self.assertEqual(len(response.context['page']), 5)
+        self.assertEqual(len(response.context['page']), 10)
         self.assertEqual(response.context['page'].number, 2)
         response = self.client.get(reverse('audit_logs'), {'start': '2026-10-25', 'end': '2026-10-24'})
         self.assertTrue(response.context['form'].non_field_errors())

@@ -8,13 +8,23 @@ class ReceiptOCRError(Exception):
 
 
 def recognize_receipt(photo, on_request=None):
+    from django.conf import settings
+    if getattr(settings, 'DESKTOP_MODE', False):
+        from google.oauth2 import service_account
+        from google.auth.exceptions import DefaultCredentialsError
+        path = settings.DESKTOP_GOOGLE_CREDENTIALS
+        if not path.is_file():
+            raise DefaultCredentialsError('Google Vision is not configured.')
+        credentials = service_account.Credentials.from_service_account_file(str(path))
+    else:
+        credentials = None
     # Normalize orientation and bound image size before sending to Google.
     with photo.open('rb') as source, Image.open(source) as original:
         image = ImageOps.exif_transpose(original).convert('RGB')
         image.thumbnail((2400, 2400))
         content = BytesIO()
         image.save(content, format='JPEG', quality=90)
-    client = vision.ImageAnnotatorClient(transport='rest')
+    client = vision.ImageAnnotatorClient(transport='rest', credentials=credentials)
     try:
         if on_request:
             on_request()

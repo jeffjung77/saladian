@@ -6,8 +6,24 @@ from . import company_views
 from . import board_views
 from . import receipt_views
 from . import vision_usage_views
+from . import system_views
+from . import opening_balances
+from . import year_end
+from . import credits
 
 urlpatterns = [
+    path('system/credits/', credits.credit_list, name='credit_list'),
+    path('system/credits/<int:pk>/', credits.credit_edit, name='credit_edit'),
+    path('management/year-end/', year_end.year_end, name='year_end'),
+    path('reports/trial-balance/', views.trial_balance, name='trial_balance'),
+    path('system/opening-balances/', opening_balances.opening_balances, name='opening_balances'),
+    path('system/voucher-counts/<int:pk>/limits/', system_views.voucher_quota_edit, name='voucher_quota_edit'),
+    path('system/voucher-counts/', system_views.user_voucher_counts, name='user_voucher_counts'),
+    path('system/notices/', system_views.notice_management, name='notice_management'),
+    path('system/notices/new/', system_views.notice_edit, name='notice_new'),
+    path('system/notices/<int:pk>/edit/', system_views.notice_edit, name='notice_edit'),
+    path('system/notices/<int:pk>/delete/', system_views.notice_delete, name='notice_delete'),
+    path('notices/<int:pk>/', system_views.notice_detail, name='notice_detail'),
     path('receipts/', receipt_views.receipt_home, name='receipt_home'),
     path('receipts/history/', receipt_views.receipt_history, name='receipt_history'),
     path('receipts/<int:pk>/', receipt_views.receipt_detail, name='receipt_detail'),

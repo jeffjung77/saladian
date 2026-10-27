@@ -27,7 +27,8 @@ class BoardTests(AuthenticatedLedgerTestCase):
             url = reverse(name, args=[post.pk] if name in ['board_detail', 'board_edit', 'board_delete'] else [])
             self.assertEqual(Client().get(url).status_code, 302)
         self.client.force_login(other)
-        self.assertContains(self.client.get(reverse('board_detail', args=[post.pk])), 'Shared')
+        self.assertEqual(self.client.get(reverse('board_detail', args=[post.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('board_list')).context['page'].paginator.count, 0)
         for name in ['board_edit', 'board_delete']:
             url = reverse(name, args=[post.pk])
             self.assertEqual(self.client.get(url).status_code, 403)
@@ -37,6 +38,21 @@ class BoardTests(AuthenticatedLedgerTestCase):
         self.assertEqual(self.client.get(reverse('board_edit', args=[post.pk])).status_code, 200)
         self.client.post(reverse('board_delete', args=[post.pk]))
         self.assertFalse(BoardPost.objects.exists())
+
+    def test_system_admin_author_filter_and_owner_isolation(self):
+        other = get_user_model().objects.create_user(username='filtered-user', is_staff=True)
+        own = BoardPost.objects.create(author=self.user, title='Own', body='Own body')
+        hidden = BoardPost.objects.create(author=other, title='Hidden', body='Secret body')
+        listing = self.client.get(reverse('board_list'), {'author': other.username})
+        self.assertEqual([p.pk for p in listing.context['page']], [own.pk])
+        self.assertEqual(self.client.post(reverse('board_comment_new', args=[hidden.pk]), {'body': 'forged'}).status_code, 404)
+        self.user.is_superuser = True
+        self.user.save()
+        listing = self.client.get(reverse('board_list'), {'author': other.username, 'q': 'Hidden'})
+        self.assertEqual([p.pk for p in listing.context['page']], [hidden.pk])
+        self.assertContains(listing, 'name="author"')
+        self.assertContains(self.client.get(reverse('board_detail', args=[hidden.pk])), 'Secret body')
+        self.assertEqual(self.client.get(reverse('board_list'), {'author': 'missing'}).context['page'].paginator.count, 0)
 
     def test_required_fields_csrf_and_menu_position(self):
         response = self.client.post(reverse('board_new'), {'title': ' ', 'body': ' '})

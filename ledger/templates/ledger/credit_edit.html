@@ -1,0 +1,6 @@
+{% extends 'ledger/base.html' %}{% load humanize %}{% block content %}
+<div class="heading"><h1>사용자 크레딧 변경</h1></div>
+<section class="panel"><p>회원아이디: <strong>{{ member.username }}</strong> · 현재 잔액: <strong>{{ account.balance|default:0|intcomma }}크레딧</strong></p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<p class="muted">입력한 값으로 보유 잔액을 변경합니다. 증감 내역·사유·처리자는 이력에 기록됩니다.</p><button>변경사항 저장</button> <a class="btn secondary" href="{% url 'credit_list' %}">목록</a></form></section>
+<section class="panel"><h2>지급·조정 이력 {{ page.paginator.count|intcomma }}건</h2><div class="table-wrap"><table style="font-size:12px"><thead><tr><th>일시</th><th class="num">증감 크레딧</th><th class="num">변경 후 잔액</th><th>사유</th><th>처리자</th><th>게시글</th></tr></thead><tbody>{% for item in page %}<tr><td>{{ item.created_at|date:'Y-m-d H:i:s' }}</td><td class="num">{% if item.amount > 0 %}+{% endif %}{{ item.amount|intcomma }}</td><td class="num">{{ item.balance_after|intcomma }}</td><td class="memo">{{ item.reason }}</td><td>{{ item.actor.username }}</td><td>{% if item.post_id %}<a href="{% url 'board_detail' item.post_id %}">#{{ item.post_id }}</a>{% else %}—{% endif %}</td></tr>{% empty %}<tr><td colspan="6">크레딧 변경 이력이 없습니다.</td></tr>{% endfor %}</tbody></table></div>{% include 'ledger/system_pagination.html' %}</section>
+{% endblock %}

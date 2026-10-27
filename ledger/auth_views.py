@@ -1,3 +1,4 @@
+from .pagination import page_size
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.decorators import login_not_required
@@ -153,7 +154,7 @@ def member_list(request):
     active = members.filter(is_active=True).count()
     if query:
         members = members.filter(username__icontains=query)
-    page = Paginator(members, 25).get_page(request.GET.get('page'))
+    page = Paginator(members, page_size(request)).get_page(request.GET.get('page'))
     return render(request, 'ledger/member_list.html', {'page': page, 'q': query, 'total': total, 'active': active, 'inactive': total-active})
 
 
@@ -233,7 +234,7 @@ def subscription_list(request):
     if query:
         subscriptions = subscriptions.filter(Q(user__username__icontains=query) | Q(company_name__icontains=query) |
             Q(business_number__icontains=query) | Q(contact_name__icontains=query) | Q(email__icontains=query))
-    page = Paginator(subscriptions, 25).get_page(request.GET.get('page'))
+    page = Paginator(subscriptions, page_size(request)).get_page(request.GET.get('page'))
     return render(request, 'ledger/subscription_list.html', {'page': page, 'q': query, 'total': total})
 
 

@@ -1,3 +1,4 @@
+from .pagination import page_size
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
@@ -27,7 +28,7 @@ def company_list(request):
     if query:
         companies = companies.filter(Q(username__icontains=query) | Q(subscription__company_name__icontains=query) |
             Q(subscription__business_number__icontains=query) | Q(business_profile__company_name__icontains=query))
-    page = Paginator(companies, 25).get_page(request.GET.get('page'))
+    page = Paginator(companies, page_size(request)).get_page(request.GET.get('page'))
     return render(request, 'ledger/company_list.html', {'page': page, 'q': query})
 
 

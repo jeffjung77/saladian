@@ -11,7 +11,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from .models import JournalRowVAT
 
 MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-TITLES = {'income_statement': '손익계산서', 'balance_sheet': '대차대조표',
+TITLES = {'trial_balance': '합계잔액 시산표', 'income_statement': '손익계산서', 'balance_sheet': '대차대조표',
           'dashboard': '전표집계', 'account_ledger': '계정별원장', 'partner_ledger': '거래처별원장'}
 
 
@@ -55,7 +55,11 @@ def report_render(request, template, context):
     sheet('조회정보', [['항목', '내용'], ['보고서', title], ['업체명', company], ['회원아이디', request.user.username],
           ['생성일시', timezone.localtime().strftime('%Y-%m-%d %H:%M:%S')]] + [[form.fields[key].label, value] for key, value in form.cleaned_data.items()])
     report = context.get('report')
-    if kind == 'income_statement':
+    if kind == 'trial_balance':
+        sheet(title, [['차변 잔액', '차변 합계', '계정코드', '계정과목', '대변 합계', '대변 잔액']] +
+              [[r['debit_balance'], r['debit'], r['account'].pk, r['account'].name, r['credit'], r['credit_balance']] for r in report['rows']] +
+              [[report['totals']['debit_balance'], report['totals']['debit'], '', '합계', report['totals']['credit'], report['totals']['credit_balance']]])
+    elif kind == 'income_statement':
         rows = [['구분', '계정코드', '계정과목', '금액(원)']]
         for section in report['sections']:
             rows.append([section['name'], '', '합계', section['total']])

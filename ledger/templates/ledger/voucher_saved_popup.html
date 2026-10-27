@@ -1,0 +1,16 @@
+{% if 'voucher-saved-popup' in message.tags %}
+<dialog id="voucher-saved-notice" aria-labelledby="voucher-saved-title" aria-describedby="voucher-saved-message">
+<h2 id="voucher-saved-title">BPMS 쉬운장부 정보알림</h2>
+<p id="voucher-saved-message">{{ message }}</p>
+<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+<a class="btn secondary" href="{% url 'dashboard' %}">전표 확인하기</a>
+<a class="btn" autofocus href="{% if 'voucher-entry-sales' in message.tags %}{% url 'sales_new' %}{% elif 'voucher-entry-expense' in message.tags %}{% url 'expense_new' %}{% else %}{% url 'voucher_new' %}{% endif %}">계속 입력하기</a>
+</div>
+</dialog>
+<style>#voucher-saved-notice{width:min(480px,calc(100% - 32px));padding:24px;border:1px solid var(--line);border-radius:12px;color:var(--ink);background:white;box-shadow:0 12px 40px #18312e33}#voucher-saved-notice::backdrop{background:#0006}</style>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('voucher-saved-notice').showModal();
+}, {once: true});
+</script>
+{% endif %}

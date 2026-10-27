@@ -1,39 +1,88 @@
 <style>
 .main-menu{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.main-menu .btn,.main-menu summary,.main-menu button{white-space:nowrap;padding:10px 14px}.nav-group{position:relative}.nav-group summary{display:block;border-radius:8px;background:#eaf0ec;cursor:pointer;list-style:none}.nav-group summary::-webkit-details-marker{display:none}.nav-group summary::after{content:' ▾';font-size:12px}.nav-group[open] summary{background:#dcebe2}.nav-group summary:focus-visible,.nav-dropdown a:focus-visible{outline:2px solid var(--green);outline-offset:2px}.nav-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:180px;padding:6px;background:white;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #18312e1a;z-index:100}.nav-dropdown a{display:block;padding:10px 12px;border-radius:6px;color:var(--ink);text-decoration:none;white-space:nowrap}.nav-dropdown a:hover,.nav-dropdown a:focus{background:#edf4ef}.nav-user{font-size:12px}.nav-logout{margin:0}@media(max-width:700px){.main-menu{width:100%;gap:6px}.main-menu .btn,.main-menu summary,.main-menu button{padding:9px 11px}.nav-dropdown{right:auto;left:0}.nav-user{margin-left:auto}}
+.main-menu .btn.nav-selected,.main-menu .nav-group.nav-selected>summary{background:#146b55;color:#fff;box-shadow:inset 0 0 0 1px #105642;font-weight:600}
+.main-menu .nav-group[open]:not(.nav-selected)>summary{background:#eaf0ec;color:var(--ink);box-shadow:none;font-weight:400}
+.main-menu .nav-dropdown a:hover,.main-menu .nav-dropdown a:focus-visible,.main-menu .nav-dropdown a:active{background:#146b55;color:#fff}
 </style>
 {% if user.is_authenticated %}
 <div class="main-menu" aria-label="주 메뉴">
-<a href="{% url 'voucher_entry' %}" class="btn secondary">전표입력</a>
-<a href="{% url 'business_overview' %}" class="btn secondary">사업현황</a>
-<details class="nav-group"><summary>보고서</summary><div class="nav-dropdown">
+<a data-nav="entry" href="{% url 'voucher_entry' %}" class="btn secondary">전표입력</a>
+<a data-nav="overview" href="{% url 'business_overview' %}" class="btn secondary">사업현황</a>
+<details class="nav-group" data-nav="reports"><summary>보고서</summary><div class="nav-dropdown">
 <a href="{% url 'income_statement' %}">손익계산서</a>
 <a href="{% url 'balance_sheet' %}">대차대조표</a>
+<a href="{% url 'trial_balance' %}">합계잔액 시산표</a>
 <a href="{% url 'dashboard' %}">전표집계</a>
 <a href="{% url 'account_ledger' %}">계정별 원장</a>
 <a href="{% url 'partner_ledger' %}">거래처별 원장</a>
 </div></details>
-{% if user.is_staff or user.is_superuser %}<details class="nav-group"><summary>관리</summary><div class="nav-dropdown">
+{% if user.is_staff or user.is_superuser %}<details class="nav-group" data-nav="management"><summary>관리</summary><div class="nav-dropdown">
 <a href="{% url 'counterparties' %}">거래처관리</a>
 <a href="{% url 'accounts' %}">계정과목표</a>
+<a href="{% url 'year_end' %}">차기이월</a>
+<a href="{% url 'partner_ledger' %}">거래처별 원장 초기화</a>
 </div></details>
-{% endif %}{% if user.is_superuser %}<details class="nav-group"><summary>시스템관리</summary><div class="nav-dropdown">
+{% endif %}{% if user.is_superuser %}<details class="nav-group" data-nav="system"><summary>시스템관리</summary><div class="nav-dropdown">
 <a href="{% url 'member_list' %}">회원현황</a>
 <a href="{% url 'subscription_list' %}">구독관리</a>
 <a href="{% url 'company_list' %}">업체관리</a>
+<a href="{% url 'user_voucher_counts' %}">사용자별 전표 수 관리</a>
+<a href="{% url 'credit_list' %}">사용자별 크레딧 관리</a>
+<a href="{% url 'notice_management' %}">공지사항 관리</a>
+<a href="{% url 'opening_balances' %}">기초잔액 올리기</a>
 <a href="{% url 'audit_logs' %}">로그조회</a>
 </div></details>
 {% endif %}
 <span class="muted nav-user">{{ user.username }}</span>
-<a href="{% url 'member_profile' %}" class="btn secondary">회원정보 변경</a>
+<a data-nav="profile" href="{% url 'member_profile' %}" class="btn secondary">회원정보 변경</a>
 <form class="nav-logout" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="secondary" type="submit">로그아웃</button></form>
-<a href="{% url 'board_list' %}" class="btn secondary">게시판</a>
+<a data-nav="board" href="{% url 'board_list' %}" class="btn secondary">게시판</a>
 </div>
 <script>
 (() => {
+ const route = "{{ request.resolver_match.url_name|escapejs }}";
+ const pages = {
+   entry: ['voucher_entry','sales_new','expense_new','voucher_new','voucher_edit','voucher_delete'],
+   overview: ['business_overview'],
+   reports: ['income_statement','balance_sheet','trial_balance','dashboard','account_ledger','partner_ledger'],
+   management: ['year_end','counterparties','counterparty_new','counterparty_edit','counterparty_certificate','counterparty_options','accounts','account_new','account_status'],
+   system: ['credit_list','credit_edit','opening_balances','voucher_quota_edit','member_list','member_grade','system_signup','subscription_list','subscription_edit','company_list','company_detail','audit_logs','vision_usage','user_voucher_counts','notice_management','notice_new','notice_edit','notice_delete'],
+   profile: ['member_profile','member_registration'],
+   board: []
+ };
+ const key = route === 'notice_detail' ? 'board' : route.startsWith('board_') ? 'board' : route.startsWith('receipt_') ? 'entry' : Object.keys(pages).find(group => pages[group].includes(route));
+ const selected = key && document.querySelector(`.main-menu [data-nav="${key}"]`);
  const groups = document.querySelectorAll('.nav-group');
- groups.forEach(group => group.addEventListener('toggle', () => {
-  if (group.open) groups.forEach(other => {if (other !== group) other.open = false;});
- }));
+ const activate = item => {
+  document.querySelectorAll('.main-menu .nav-selected').forEach(current => current.classList.remove('nav-selected'));
+  if (item) item.classList.add('nav-selected');
+ };
+ activate(selected);
+ if (selected) {
+  if (selected.matches('a')) selected.setAttribute('aria-current', 'page');
+  else selected.querySelector('summary').setAttribute('aria-current', 'true');
+ }
+ document.querySelectorAll('.main-menu>a.btn').forEach(link => {
+  link.addEventListener('pointerdown', () => activate(link));
+  link.addEventListener('click', () => {
+   groups.forEach(group => group.open = false);
+   activate(link);
+  });
+  link.addEventListener('pointercancel', () => activate(selected));
+ });
+ groups.forEach(group => {
+  group.querySelector('summary').addEventListener('pointerdown', () => activate(group));
+  group.addEventListener('toggle', () => {
+   if (group.open) {
+    groups.forEach(other => {if (other !== group) other.open = false;});
+    activate(group);
+   } else {
+    const opened = Array.from(groups).find(other => other.open);
+    activate(opened || selected);
+   }
+  });
+ });
+ window.addEventListener('pageshow', () => activate(Array.from(groups).find(group => group.open) || selected));
  document.addEventListener('click', event => {groups.forEach(group => {if (!group.contains(event.target)) group.open = false;});});
  document.addEventListener('keydown', event => {
   if (event.key === 'Escape') groups.forEach(group => {if (group.open) {group.open = false; group.querySelector('summary').focus();}});

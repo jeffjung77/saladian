@@ -1,0 +1,5 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><h1>공지사항 {% if notice %}수정{% else %}등록{% endif %}</h1></div>
+<p class="muted">시작일·종료일을 포함한 기간에 게시판과 공지 팝업에 표시됩니다. 날짜를 비우면 해당 방향의 기간 제한이 없습니다. ‘회원에게 게시’를 선택해야 노출됩니다.</p>
+<form class="panel" method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}{% if field.name == 'start_date' %}<div class="notice-date-row">{% endif %}<div class="auth-field"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{{ field.errors }}</div>{% if field.name == 'end_date' %}</div>{% endif %}{% endfor %}<button>저장</button> <a class="btn secondary" href="{% url 'notice_management' %}">취소</a></form>
+<style>.notice-date-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.notice-date-row>div{min-width:0}.notice-date-row input{min-width:0;width:100%}</style>{% endblock %}

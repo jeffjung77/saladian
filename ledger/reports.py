@@ -72,6 +72,35 @@ def balance_side(net):
     return '차변' if net > 0 else '대변' if net < 0 else '—'
 
 
+def trial_balance(as_of, *, vouchers):
+    """기준일까지의 차대변 총액과 계정별 순잔액(결산전표 포함)."""
+    accounts = {a.pk: a for a in Account.objects.all()}
+    amounts = defaultdict(lambda: {'debit': ZERO, 'credit': ZERO})
+    excluded, included = [], 0
+    source = vouchers.filter(date__lte=as_of).select_related('account_master', 'settlement_account', 'counterparty').prefetch_related('journal_lines__account')
+    for voucher in source:
+        postings, reason = voucher_postings(voucher, accounts)
+        if reason:
+            excluded.append({'voucher': voucher, 'reason': reason})
+            continue
+        for posting in postings:
+            net = posting['net']
+            amounts[posting['account_id']]['debit'] += max(net, ZERO)
+            amounts[posting['account_id']]['credit'] += max(-net, ZERO)
+        included += 1
+    rows = []
+    keys = ('debit', 'credit', 'debit_balance', 'credit_balance')
+    for code in sorted(amounts):
+        values = amounts[code]
+        net = values['debit'] - values['credit']
+        rows.append({'account': accounts[code], **values,
+                     'debit_balance': max(net, ZERO), 'credit_balance': max(-net, ZERO)})
+    totals = {key: sum((row[key] for row in rows), ZERO) for key in keys}
+    return {'rows': rows, 'totals': totals, 'difference': totals['debit'] - totals['credit'],
+            'balance_difference': totals['debit_balance'] - totals['credit_balance'],
+            'excluded': excluded, 'included_count': included}
+
+
 def account_ledger(account, start, end, *, vouchers=None):
     accounts = {a.pk: a for a in Account.objects.all()}
     opening = debit = credit = ZERO
