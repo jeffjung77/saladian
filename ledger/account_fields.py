@@ -3,6 +3,16 @@ from django import forms
 
 class AccountEntryField(forms.ModelChoiceField):
     """Resolve typed codes or exact names against this field's allowed accounts."""
+    display_code_and_name = False
+
+    def prepare_value(self, value):
+        prepared = super().prepare_value(value)
+        if self.display_code_and_name and prepared not in self.empty_values:
+            account = self.queryset.filter(pk=str(prepared)).first()
+            if account:
+                return str(account)
+        return prepared
+
     def to_python(self, value):
         if value in self.empty_values:
             return None

@@ -294,6 +294,7 @@ class YearEndClosing(models.Model):
 
 
 class Voucher(models.Model):
+    submission_token = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     class EntryType(models.TextChoices):
         SALES = 'sales', '매출입력'
         EXPENSE = 'expense', '비용입력'
@@ -359,6 +360,11 @@ class Voucher(models.Model):
         constraints = [models.CheckConstraint(condition=models.Q(amount__gt=0), name='voucher_amount_positive')]
 
 # Create your models here.
+
+
+class ExpenseChartPreference(models.Model):
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    enabled = models.BooleanField(default=False)
 
 
 class JournalRowVAT(models.Model):

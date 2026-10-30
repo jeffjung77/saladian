@@ -8,25 +8,21 @@
   } catch (_) {}
   document.documentElement.style.zoom = String(zoom / 100);
   const setup = () => {
-    const title = document.querySelector('main h1');
-    if (!title) return;
-    let heading = title.closest('.heading');
-    if (!heading) {
-      heading = document.createElement('div');
-      heading.className = 'page-zoom-title';
-      title.parentNode.insertBefore(heading, title);
-      heading.appendChild(title);
-    }
+    const brand = document.querySelector('header nav > .brand');
+    if (!brand) return;
+    const row = document.createElement('div');
+    row.className = 'brand-row';
+    brand.parentNode.insertBefore(row, brand);
+    row.appendChild(brand);
     const section = document.createElement('section');
     section.className = 'panel page-zoom-section';
-    section.setAttribute('aria-label', '화면축소/확대');
-    heading.classList.add('has-page-zoom');
-    heading.appendChild(section);
+    section.setAttribute('aria-label', '화면크기');
+    row.appendChild(section);
     const toolbar = document.createElement('div');
     toolbar.className = 'page-zoom-controls';
     toolbar.setAttribute('role', 'group');
-    toolbar.setAttribute('aria-label', '화면축소/확대');
-    toolbar.innerHTML = '<span>화면축소/확대</span><button type="button" class="secondary" aria-label="화면 축소">−</button><output aria-live="polite"></output><button type="button" class="secondary" aria-label="화면 확대">+</button>';
+    toolbar.setAttribute('aria-label', '화면크기');
+    toolbar.innerHTML = '<span>화면크기</span><button type="button" class="secondary" aria-label="화면 축소">−</button><output aria-live="polite"></output><button type="button" class="secondary" aria-label="화면 확대">+</button>';
     section.appendChild(toolbar);
     const [minus, plus] = toolbar.querySelectorAll('button');
     const output = toolbar.querySelector('output');

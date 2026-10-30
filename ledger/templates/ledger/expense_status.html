@@ -1,0 +1,6 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><h1>비용 현황보기</h1></div>
+<section class="panel"><form method="get" class="filter">{{ form.month.errors }}{{ form.user.errors }}<div>{{ form.user.label_tag }}{{ form.user }}</div><div>{{ form.month.label_tag }}{{ form.month }}</div><button>조회</button></form></section>
+<section class="panel">{% include 'ledger/expense_chart.html' %}</section>
+<div class="notice">조회할 월을 선택하면 본인의 비용 상위 10개 계정과목을 확인할 수 있습니다.</div>
+{% endblock %}

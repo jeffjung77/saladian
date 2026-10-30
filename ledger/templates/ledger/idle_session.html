@@ -1,0 +1,4 @@
+{% if user.is_authenticated %}{% load static %}
+<script id="idle-session-config" type="application/json">{"user":"{{ user.pk }}","activity":"{% url 'session_activity' %}","logout":"{% url 'logout' %}","login":"{% url 'login' %}","csrf":"{{ csrf_token }}"}</script>
+<script src="{% static 'ledger/idle_session.js' %}?v=1"></script>
+{% endif %}

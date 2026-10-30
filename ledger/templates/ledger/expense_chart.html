@@ -1,0 +1,7 @@
+{% load humanize %}
+<h2>{{ expense_month|date:'Y년 m월' }} 비용 상위 10개 계정과목</h2>
+{% for row in expense_rows %}
+<div style="margin:10px 0;font-size:12px"><div style="display:flex;justify-content:space-between;gap:8px"><span>{{ forloop.counter }}. {{ row.name }}</span><strong>{{ row.amount|intcomma }}원</strong></div><div style="background:#eaf0ec;height:12px;border-radius:4px"><div style="background:#146b55;height:100%;border-radius:4px;width:{{ row.width|stringformat:'.2f' }}%"></div></div></div>
+{% empty %}<p class="muted">해당 월에 집계할 비용이 없습니다.</p>{% endfor %}
+<p class="muted" style="font-size:12px">계정과목별 순비용이 큰 순서입니다. 손익대체 결산전표는 제외합니다.</p>
+{% if expense_excluded %}<p class="expense">분개 확인이 필요한 전표 {{ expense_excluded }}건은 제외했습니다.</p>{% endif %}

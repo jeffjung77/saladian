@@ -3,6 +3,7 @@ from django import forms
 from decimal import Decimal
 from .models import Voucher, Account, Counterparty
 import re
+import uuid
 from .vat import VAT_FIELDS, VAT_CHOICES, TRADE_CHOICES, DOCUMENT_CHOICES, DEDUCTION_CHOICES
 from .widgets import MoneyInput
 from .account_settings import visible_accounts, selectable_accounts, CATEGORIES
@@ -128,6 +129,7 @@ class CounterpartySelectionMixin:
 
 
 class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
+    submission_token = forms.UUIDField(required=False, initial=uuid.uuid4, widget=forms.HiddenInput)
     memo = forms.CharField(label='적요', required=False, max_length=200,
         widget=forms.Textarea(attrs={'rows': 3, 'maxlength': 200, 'placeholder': '거래 내용을 입력하세요 (최대 200자)', 'style': 'resize:vertical'}))
     vat_enabled = forms.BooleanField(label='부가세 입력', required=False)
@@ -136,6 +138,7 @@ class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
 
     def __init__(self, *args, entry_type=Voucher.EntryType.OTHER, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['account_master'].display_code_and_name = True
         self.instance.entry_type = entry_type
         self.fields['kind'].choices = [(Voucher.Kind.INCOME, '수입'), (Voucher.Kind.EXPENSE, '지출')]
         if entry_type == Voucher.EntryType.SALES:
@@ -200,6 +203,7 @@ class VoucherForm(CounterpartySelectionMixin, VatFormMixin, forms.ModelForm):
 
 
 class JournalHeaderForm(CounterpartySelectionMixin, forms.ModelForm):
+    submission_token = forms.UUIDField(required=False, initial=uuid.uuid4, widget=forms.HiddenInput)
     memo = forms.CharField(label='적요', required=False, max_length=50,
         widget=forms.Textarea(attrs={'rows': 1, 'maxlength': 50, 'placeholder': '거래 내용을 입력하세요 (최대 50자)', 'style': 'resize:vertical'}))
     class Meta:

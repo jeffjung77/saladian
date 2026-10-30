@@ -19,3 +19,4 @@ build/
 dist/
 desktop/build-data/
 *.spec
+~$*

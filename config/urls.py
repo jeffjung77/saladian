@@ -17,8 +17,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from ledger.auth_views import LedgerLoginView, LedgerLogoutView, signup, check_username
+from ledger.idle_session import activity
 
 urlpatterns = [
+    path('accounts/activity/', activity, name='session_activity'),
     path('accounts/login/', LedgerLoginView.as_view(), name='login'),
     path('accounts/logout/', LedgerLogoutView.as_view(), name='logout'),
     path('accounts/signup/', signup, name='signup'),

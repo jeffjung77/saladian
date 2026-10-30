@@ -1,11 +1,12 @@
 {% load static %}
 <style>
-.has-page-zoom{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.has-page-zoom>.page-zoom-section{display:inline-flex;justify-content:flex-end;align-items:center;flex:0 0 auto;width:max-content;max-width:100%;margin:0 0 0 auto;padding:8px 12px}
+.brand-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:100%;min-width:0}
+.brand-row>.page-zoom-section{display:inline-flex;justify-content:flex-end;align-items:center;flex:0 0 auto;width:max-content;max-width:100%;margin:0 0 0 auto;padding:8px 12px}
+@media(max-width:700px){.brand-row>.brand{display:grid;grid-template-columns:auto minmax(0,1fr);min-width:0;gap:8px;align-items:center}}
 .page-zoom-controls{display:inline-flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0;white-space:nowrap;font-size:12px}
 .page-zoom-controls button{padding:4px 10px;min-width:32px;min-height:32px;font-size:18px;line-height:1.2}
 .page-zoom-controls output{min-width:38px;text-align:center;font-variant-numeric:tabular-nums}
 .page-zoom-controls button:disabled{opacity:.4;cursor:default}
 @media print{html{zoom:1!important}.page-zoom-section,.page-zoom-controls{display:none!important}}
 </style>
-<script src="{% static 'ledger/page_zoom.js' %}?v=3"></script>
+<script src="{% static 'ledger/page_zoom.js' %}?v=5"></script>

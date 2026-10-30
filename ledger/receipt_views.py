@@ -205,7 +205,7 @@ def receipt_expense(request, pk):
         else:
             if saved:
                 request._audit_target = saved.pk
-                messages.success(request, '영수증을 연결한 비용전표를 생성했습니다.')
+                messages.success(request, '영수증을 연결한 비용전표를 생성했습니다.', extra_tags='voucher-created')
             else:
                 messages.info(request, '영수증 상태가 변경되었습니다. 처리 내역을 확인하세요.')
             return redirect('receipt_detail', pk=pk)

@@ -24,6 +24,7 @@ from .permissions import management_required
 from .forms import AccountForm
 from .models import AccountPreference
 from .account_settings import visible_accounts
+from .voucher_submission import prevent_duplicate_submission
 
 
 @login_not_required
@@ -269,6 +270,7 @@ def dashboard(request):
 
 
 @require_http_methods(['GET', 'POST'])
+@prevent_duplicate_submission
 def edit(request, pk=None, entry_type=Voucher.EntryType.OTHER):
     voucher = get_object_or_404(Voucher, pk=pk, owner=request.user) if pk else None
     if voucher and voucher.closing_batch_id:
@@ -283,6 +285,8 @@ def edit(request, pk=None, entry_type=Voucher.EntryType.OTHER):
     if request.method == 'POST' and form.is_valid():
         saved = form.save(commit=False)
         saved.owner = request.user
+        if not voucher:
+            saved.submission_token = form.cleaned_data.get('submission_token')
         try:
             save_voucher(saved)
         except VoucherQuotaExceeded as exc:
@@ -319,6 +323,8 @@ def journal_edit(request, voucher=None):
                 with transaction.atomic():
                     saved = form.save(commit=False)
                     saved.owner = request.user
+                    if not voucher:
+                        saved.submission_token = form.cleaned_data.get('submission_token')
                     saved.entry_type = Voucher.EntryType.OTHER
                     saved.kind = Voucher.Kind.JOURNAL
                     saved.account = '복합전표'

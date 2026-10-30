@@ -1,0 +1,42 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>매출전표 입력</title><style>
+@page{size:A4;margin:15mm}*{box-sizing:border-box}body{margin:0;font:9.5pt/1.45 'Malgun Gothic',sans-serif;color:#18312e}h1{font-size:25pt;color:#146b55;margin:6mm 0 2mm}h2{font-size:16pt;margin:4mm 0 3mm}h3{font-size:11pt;margin:4mm 0 2mm}p{margin:2mm 0 3mm}.page{break-after:page}.page:last-child{break-after:auto}.muted{color:#64756d}.tag{display:inline-block;padding:2mm 4mm;border-radius:5px;background:#edf4ef;font-size:9pt}table{width:100%;border-collapse:collapse;font-size:9pt;margin:3mm 0}th,td{text-align:left;vertical-align:top;padding:2.5mm;border-bottom:1px solid #dce5df}th{background:#edf4ef}td:first-child{width:31%;font-weight:bold}tr{break-inside:avoid}.note{background:#edf4ef;border-left:3px solid #146b55;padding:4mm;margin:4mm 0}.foot{margin-top:6mm;border-top:1px solid #dce5df;padding-top:3mm;font-size:9pt;color:#64756d}ol{padding-left:7mm}li{margin:2mm 0}.tabs{display:flex;gap:3mm;margin:4mm 0}.tabs span{background:#eaf0ec;padding:2mm 4mm;border-radius:5px}.tabs .active{background:#146b55;color:white}
+</style><body>
+<section class="page"><span class="tag">BPMS 쉬운장부 · 사용자 설명서 · 알파 1.0</span><h1>매출전표 입력</h1><p class="muted">2026년 10월 30일 개발 화면 기준</p>
+<h2>1. 화면 열기</h2><p>상단 <strong>전표입력 → 매출전표 생성</strong>을 선택합니다. 전표 입력 화면 사이에서는 아래의 <strong>매출입력</strong> 버튼으로 이동할 수도 있습니다.</p><div class="tabs"><span class="active">매출입력</span><span>비용입력</span><span>일반전표</span></div><p>매출 거래를 수입으로 기록하는 화면입니다. * 표시가 있는 항목은 필수이며, 금액은 원 단위의 양의 정수로 입력합니다.</p>
+<h2>2. 기본 입력 항목</h2><table><thead><tr><th>항목</th><th>입력 방법</th></tr></thead><tbody>
+<tr><td>전표일자 *</td><td>거래를 기록할 날짜를 입력하거나 달력에서 선택합니다. 화면에 표시된 기본 날짜가 실제 거래일과 맞는지 확인하세요.</td></tr>
+<tr><td>거래처</td><td>등록된 거래처를 선택합니다. 선택하지 않으면 ‘거래처 미지정’으로 기록됩니다. 거래처별 원장에 연결하려면 해당 거래처를 지정하세요.</td></tr>
+<tr><td>상대계정 *</td><td>현금·예금·외상매출금 등 매출의 상대 계정을 선택합니다. 계정코드 또는 정확한 계정과목명을 직접 입력해 찾을 수 있습니다. 등록된 사용 가능 계정만 저장할 수 있습니다.</td></tr>
+<tr><td>계정과목 *</td><td>매출 계정과목을 선택합니다. 예: ‘5001 · 매출-용역’. 계정코드·정확한 계정명 또는 목록의 코드·계정명 조합으로 입력할 수 있습니다. 기본값이 거래에 맞는지 확인하세요.</td></tr>
+<tr><td>공급가액 / 부가세 제외 금액(원) *</td><td>부가세를 제외한 금액을 입력합니다. 예: 공급가액 100,000원과 부가세 10,000원인 거래라면 이 칸에는 100,000을 입력합니다. 금액은 세 자리마다 콤마로 표시됩니다.</td></tr>
+<tr><td>적요</td><td>거래 내용을 최대 200자로 입력합니다. 예: ‘10월 홈페이지 제작 용역대금’. 나중에 거래를 구분할 수 있도록 작성하세요.</td></tr>
+</tbody></table>
+<h3>상대계정 info아이콘</h3><p>‘상대계정 *’ 옆 ⓘ 아이콘에 마우스를 올리면 분개 반영 방법을 확인할 수 있습니다. 매출은 상대계정 차변, 선택한 매출 계정과목 대변으로 반영됩니다.</p>
+<div class="note"><strong>직접 입력은 새 계정과목 등록이 아닙니다.</strong><br>목록에 없는 이름을 임의로 입력하면 저장할 수 없습니다. 계정코드를 확인하거나 관리자에게 계정과목 등록을 요청하세요.</div>
+<div class="foot">1 / 3 · 개발: BPMS · 개발자 연락처: INFO@BPMS.CO.KR</div></section>
+<section class="page"><h2>3. 거래처가 목록에 없을 때</h2><ol><li><strong>+ 거래처 등록 (새 창)</strong> 버튼을 눌러 새 창에서 거래처를 등록합니다. 거래처 등록은 관리자 권한이 필요합니다.</li><li>거래처 저장 후 원래 매출입력 화면으로 돌아옵니다.</li><li><strong>목록 새로고침</strong>을 눌러 거래처 선택 목록을 갱신합니다. 작성 중인 전표 내용은 유지됩니다.</li><li>추가한 거래처를 선택합니다. 목록 새로고침 오른쪽의 ⓘ 아이콘에서도 안내를 볼 수 있습니다.</li></ol>
+<h2>4. 부가세 정보 입력</h2><p>부가세 정보를 함께 기록하려면 <strong>부가세 입력</strong>을 선택합니다. 선택 전에는 아래 항목이 회색으로 표시되어 입력할 수 없습니다.</p>
+<table><thead><tr><th>항목</th><th>입력 방법</th></tr></thead><tbody>
+<tr><td>부가세 코드</td><td>거래에 맞는 과세(T), 면세(E), 영세율(Z), 대상 외(X) 분류를 선택합니다. 예: 국내 용역 거래는 목록의 ‘T02 · 국내 용역 거래’ 항목을 확인합니다.</td></tr>
+<tr><td>부가세 매출·매입</td><td>매출입력 화면에서는 ‘S · 매출’로 지정됩니다. 비용·매입을 기록할 때는 비용입력 화면을 사용하세요.</td></tr>
+<tr><td>증빙 종류</td><td>실제 보유한 증빙을 선택합니다. 예: 세금계산서, 계산서, 신용카드·체크카드 매출전표, 현금영수증 등.</td></tr>
+<tr><td>매입세액 공제 구분</td><td>주로 매입 관련 정보를 구분하는 항목입니다. 일반적인 매출 입력에서 임의로 공제를 지정하지 마세요. 적용 여부를 확인한 경우에만 입력합니다.</td></tr>
+<tr><td>부가세 금액(원)</td><td>증빙에 적힌 부가세 금액을 별도로 입력합니다. 공급가액 칸에 부가세를 다시 포함하지 않도록 확인하세요.</td></tr>
+<tr><td>공통매입 중 공제할 세액(원)</td><td>공통매입 안분과 관련된 항목입니다. 일반적인 매출 거래에서는 기본값 0을 확인하세요.</td></tr>
+<tr><td>불공제·안분 사유 / 검토 메모</td><td>해당되는 경우에만 공제 구분의 사유나 검토 내용을 입력합니다.</td></tr>
+</tbody></table>
+<div class="note">부가세 코드는 프로그램 자체 관리용 분류이며 홈택스 공식 전자신고 코드가 아닙니다. 이 화면은 세무 신고서를 제출하는 기능을 제공하지 않습니다. 거래의 세무 분류는 실제 증빙과 확인된 처리 기준에 맞춰 선택하세요.</div>
+<p><strong>부가세 입력을 선택하지 않으면</strong> 부가세 관련 값은 비활성화되고 저장 시 부가세 없이 처리됩니다. 과세 거래를 기록할 때는 선택 여부와 금액을 반드시 확인하세요.</p>
+<div class="foot">2 / 3 · 매출전표 입력 · BPMS 쉬운장부</div></section>
+<section class="page"><h2>5. 입력 예시와 저장 순서</h2><p>아래는 공급가액 100,000원, 부가세 10,000원의 국내 용역 매출을 예금으로 받은 경우의 <strong>프로그램 입력 예시</strong>입니다. 실제 거래와 증빙에 맞는 계정을 사용하세요.</p>
+<table><thead><tr><th>항목</th><th>예시 값</th></tr></thead><tbody><tr><td>전표일자 / 거래처</td><td>실제 거래일 / 해당 거래처</td></tr><tr><td>상대계정 / 계정과목</td><td>1102 · 예금 / 5001 · 매출-용역</td></tr><tr><td>공급가액 / 적요</td><td>100,000 / 홈페이지 제작 용역대금</td></tr><tr><td>부가세 입력</td><td>선택 → T02 · 국내 용역 거래 → S · 매출</td></tr><tr><td>증빙 / 부가세 금액</td><td>실제 발급한 증빙 종류 / 10,000</td></tr></tbody></table>
+<p>이 예시에서 상대계정에는 합계 110,000원이 반영되며, 매출은 100,000원, 매출부가세는 10,000원으로 구분됩니다.</p>
+<ol><li>거래일·거래처·계정과목·금액·적요를 확인합니다.</li><li>부가세 입력 여부와 공급가액·부가세 구분을 확인합니다.</li><li><strong>전표 저장</strong>을 누릅니다.</li><li>‘<strong>전표가 저장되었습니다. 전표번호는 ○○ 번입니다.</strong>’ 안내를 확인합니다.</li><li><strong>전표 확인하기</strong>를 선택하면 전표집계로 이동합니다. <strong>계속 입력하기</strong>를 선택하면 새 매출전표 입력 화면으로 이동합니다.</li></ol>
+<h2>6. 저장·취소 시 주의사항</h2><table><thead><tr><th>상황</th><th>확인할 내용</th></tr></thead><tbody>
+<tr><td>입력 오류</td><td>필수값 누락, 계정과목 불일치, 금액 오류 등이 있으면 안내를 확인하고 수정합니다. 저장 오류가 발생한 경우 입력값은 유지됩니다.</td></tr>
+<tr><td>생성 한도 도달</td><td>‘전표 생성 한도(○건)에 도달하여 전표를 저장할 수 없습니다. 시스템관리자에게 문의하세요.’ 안내가 나오면 관리자에게 한도를 확인합니다.</td></tr>
+<tr><td>취소</td><td>현재 입력 내용을 저장하지 않고 전표집계 화면으로 이동합니다. 이동 전에 필요한 내용을 확인하세요.</td></tr>
+<tr><td>뒤로가기 / 중복 입력</td><td>저장 후 뒤로가기로 복원된 입력 화면은 새 양식으로 전환됩니다. 같은 저장 요청의 재전송도 중복 생성되지 않도록 처리합니다. 새 양식으로 같은 거래를 다시 입력하는 경우까지 막는 것은 아니므로 기존 전표를 먼저 확인하세요.</td></tr>
+<tr><td>장시간 미사용</td><td>30분간 활동이 없으면 자동 로그아웃됩니다. 저장하지 않은 내용이 사라질 수 있으므로 작성 후 저장 완료 안내를 확인하세요.</td></tr>
+</tbody></table>
+<div class="foot">3 / 3 · 문의: INFO@BPMS.CO.KR · 2026년 10월 30일 개발 버전 기준</div></section></body></html>

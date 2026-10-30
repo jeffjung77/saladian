@@ -15,9 +15,11 @@
 <a href="{% url 'dashboard' %}">전표집계</a>
 <a href="{% url 'account_ledger' %}">계정별 원장</a>
 <a href="{% url 'partner_ledger' %}">거래처별 원장</a>
+<a href="{% url 'expense_status' %}">비용 현황보기</a>
 </div></details>
 {% if user.is_staff or user.is_superuser %}<details class="nav-group" data-nav="management"><summary>관리</summary><div class="nav-dropdown">
 <a href="{% url 'counterparties' %}">거래처관리</a>
+<a href="{% url 'counterparty_import' %}" style="padding-left:24px">↳ 거래처 엑셀 업로드</a>
 <a href="{% url 'accounts' %}">계정과목표</a>
 <a href="{% url 'year_end' %}">차기이월</a>
 <a href="{% url 'partner_ledger' %}">거래처별 원장 초기화</a>
@@ -44,8 +46,8 @@
  const pages = {
    entry: ['voucher_entry','sales_new','expense_new','voucher_new','voucher_edit','voucher_delete'],
    overview: ['business_overview'],
-   reports: ['income_statement','balance_sheet','trial_balance','dashboard','account_ledger','partner_ledger'],
-   management: ['year_end','counterparties','counterparty_new','counterparty_edit','counterparty_certificate','counterparty_options','accounts','account_new','account_status'],
+   reports: ['income_statement','balance_sheet','trial_balance','dashboard','account_ledger','partner_ledger','expense_status'],
+   management: ['counterparty_import','counterparty_import_template','year_end','counterparties','counterparty_new','counterparty_edit','counterparty_certificate','counterparty_options','accounts','account_new','account_status'],
    system: ['credit_list','credit_edit','opening_balances','voucher_quota_edit','member_list','member_grade','system_signup','subscription_list','subscription_edit','company_list','company_detail','audit_logs','vision_usage','user_voucher_counts','notice_management','notice_new','notice_edit','notice_delete'],
    profile: ['member_profile','member_registration'],
    board: []
