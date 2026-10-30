@@ -12,8 +12,12 @@ from . import year_end
 from . import credits
 from . import expense_views
 from . import counterparty_import
+from . import deployment, deployment_views
 
 urlpatterns = [
+    path('deployment/status/', deployment.status, name='deployment_status'),
+    path('maintenance/', deployment.maintenance, name='deployment_maintenance'),
+    path('system/deployments/', deployment_views.deployment_management, name='deployment_management'),
     path('partners/import/', counterparty_import.upload, name='counterparty_import'),
     path('partners/import/template/', counterparty_import.template, name='counterparty_import_template'),
     path('management/expenses/', expense_views.expense_status, name='expense_status'),

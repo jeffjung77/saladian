@@ -367,6 +367,37 @@ class ExpenseChartPreference(models.Model):
     enabled = models.BooleanField(default=False)
 
 
+class DeploymentSchedule(models.Model):
+    class Status(models.TextChoices):
+        QUEUED = 'queued', '사전 검사 대기'
+        READY = 'ready', '예약 확정'
+        RUNNING = 'running', '배포 중'
+        SUCCEEDED = 'succeeded', '배포 완료'
+        FAILED = 'failed', '사전 검사 실패 / 미실행'
+        CANCELLED = 'cancelled', '취소'
+        ROLLED_BACK = 'rolled_back', '실패 후 이전 버전 복구 완료'
+        ATTENTION = 'attention', '복구 확인 필요 · 점검 유지'
+
+    scheduled_date = models.DateField('배포 날짜')
+    commit = models.CharField('고정 커밋', max_length=40)
+    branch = models.CharField('Git 브랜치', max_length=100, default='1-6')
+    message = models.CharField('사용자 안내', max_length=500, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    sessions_cleared_at = models.DateTimeField(null=True, blank=True)
+    previous_commit = models.CharField(max_length=40, blank=True)
+    backup_path = models.CharField(max_length=500, blank=True)
+    result = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-scheduled_date', '-pk']
+        constraints = [models.UniqueConstraint(fields=['scheduled_date'],
+            condition=models.Q(status__in=['queued', 'ready', 'running', 'attention']), name='one_active_deployment_per_date')]
+
+
 class JournalRowVAT(models.Model):
     voucher = models.ForeignKey(Voucher, related_name='row_vat', on_delete=models.CASCADE)
     row = models.PositiveSmallIntegerField('행 번호')

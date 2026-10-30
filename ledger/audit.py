@@ -9,6 +9,7 @@ ACTIONS = [('view', '조회'), ('create', '등록'), ('update', '수정'), ('del
            ('login', '로그인'), ('logout', '로그아웃')]
 RESULTS = [('success', '성공'), ('invalid', '입력 오류'), ('denied', '권한 없음'), ('error', '오류')]
 RESOURCES = {
+    'deployment_management': '배포 예약 관리',
     'credit_list': '사용자별 크레딧 현황', 'credit_edit': '사용자 크레딧 변경',
     'year_end': '차기이월',
     'opening_balances': '기초잔액 올리기',

@@ -48,6 +48,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'ledger.deployment.DeploymentMiddleware',
     'ledger.idle_session.IdleSessionMiddleware',
     'ledger.audit.AuditMiddleware',
     'django.contrib.auth.middleware.LoginRequiredMiddleware',
@@ -57,6 +58,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 IDLE_TIMEOUT_SECONDS = 30 * 60
+DEPLOYMENT_SCHEDULER_ENABLED = os.environ.get('BPMS_DEPLOYMENT_SCHEDULER') == '1'
 
 TEMPLATES = [
     {

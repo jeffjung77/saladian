@@ -12,6 +12,8 @@ class IdleSessionMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if request.path in ['/deployment/status/', '/maintenance/']:
+            return self.get_response(request)
         if request.user.is_authenticated:
             now = time.time()
             previous = request.session.get('last_activity_at', now)

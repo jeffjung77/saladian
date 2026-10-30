@@ -1,0 +1,17 @@
+[Unit]
+Description=BPMS scheduled deployment controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/bpms/app
+EnvironmentFile=/etc/bpms.env
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+ExecStart=/usr/bin/flock -n /srv/bpms/deploy/runner.lock /srv/bpms/venv/bin/python /usr/local/lib/bpms/deployment_runner.py
+TimeoutStartSec=25min
+TimeoutStopSec=10min
+KillMode=mixed
+

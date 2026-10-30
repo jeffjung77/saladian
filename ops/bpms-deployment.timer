@@ -1,0 +1,12 @@
+[Unit]
+Description=Check BPMS deployment reservations every minute (Korea time)
+
+[Timer]
+OnCalendar=*-*-* *:*:00 Asia/Seoul
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=true
+Unit=bpms-deployment.service
+
+[Install]
+WantedBy=timers.target
