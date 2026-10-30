@@ -14,6 +14,9 @@ from ledger.deployment import windows
 
 class Command(BaseCommand):
     help = 'Trusted server scheduler interface (not exposed as HTTP).'
+    # Minute polling must not load the full receipt/OCR URL stack on a small server.
+    # Release validation explicitly runs manage.py check and the health operation.
+    requires_system_checks = []
 
     def add_arguments(self, parser):
         parser.add_argument('operation', choices=['tick', 'mark', 'info', 'snapshot', 'verify', 'health', 'cancel'])
