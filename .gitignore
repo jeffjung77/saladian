@@ -25,3 +25,5 @@ migration_backup/
 logs/
 *.pid
 .postgres-init-password
+backups/
+google-vision.json

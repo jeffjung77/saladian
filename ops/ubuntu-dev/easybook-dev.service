@@ -1,0 +1,16 @@
+[Unit]
+Description=Easybook Development Web Service
+After=network.target postgresql.service
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/srv/easybook-dev/app
+Environment=DJANGO_SETTINGS_MODULE=config.ubuntu_dev
+ExecStart=/srv/easybook-dev/venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8001 --workers 2 --timeout 120 --access-logfile - --error-logfile -
+Restart=on-failure
+RestartSec=5
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
