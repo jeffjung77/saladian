@@ -28,12 +28,14 @@
 <a href="{% url 'member_list' %}">회원현황</a>
 <a href="{% url 'subscription_list' %}">구독관리</a>
 <a href="{% url 'company_list' %}">업체관리</a>
+<a href="{% url 'company_members' %}">업체 장부 공유 관리</a>
 <a href="{% url 'user_voucher_counts' %}">사용자별 전표 수 관리</a>
 <a href="{% url 'credit_list' %}">사용자별 크레딧 관리</a>
 <a href="{% url 'notice_management' %}">공지사항 관리</a>
 <a href="{% url 'opening_balances' %}">기초잔액 올리기</a>
 <a href="{% url 'audit_logs' %}">로그조회</a>
 <a href="{% url 'deployment_management' %}">배포 예약 관리</a>
+<a href="{% url 'online_users' %}">사용자 접속현황</a>
 </div></details>
 {% endif %}
 <span class="muted nav-user">{{ user.username }}</span>
@@ -49,7 +51,7 @@
    overview: ['business_overview'],
    reports: ['income_statement','balance_sheet','trial_balance','dashboard','account_ledger','partner_ledger','expense_status'],
    management: ['counterparty_import','counterparty_import_template','year_end','counterparties','counterparty_new','counterparty_edit','counterparty_certificate','counterparty_options','accounts','account_new','account_status'],
-   system: ['deployment_management','credit_list','credit_edit','opening_balances','voucher_quota_edit','member_list','member_grade','system_signup','subscription_list','subscription_edit','company_list','company_detail','audit_logs','vision_usage','user_voucher_counts','notice_management','notice_new','notice_edit','notice_delete'],
+   system: ['company_members','online_users','deployment_management','credit_list','credit_edit','opening_balances','voucher_quota_edit','member_list','member_grade','system_signup','subscription_list','subscription_edit','company_list','company_detail','audit_logs','vision_usage','user_voucher_counts','notice_management','notice_new','notice_edit','notice_delete'],
    profile: ['member_profile','member_registration'],
    board: []
  };

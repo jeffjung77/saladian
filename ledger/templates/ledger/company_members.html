@@ -1,0 +1,5 @@
+{% extends 'ledger/base.html' %}{% block content %}
+<div class="heading"><h1>업체 장부 공유 관리</h1><p class="muted">동일 업체명 회원을 승인하여 하나의 장부를 공유합니다.</p></div>
+<section class="panel"><h2>공유 연결 승인</h2><p>새 회원은 승인 전까지 개인 장부를 사용합니다. 승인하면 기존 전표·거래처·영수증도 대상 업체 회원에게 공유됩니다. 아이디별 권한·한도·크레딧은 유지됩니다. 업체명을 수정해도 장부 연결은 자동 변경되지 않습니다.</p><form method="post">{% csrf_token %}{{ form.as_p }}<button>장부 공유 승인</button></form></section>
+<section class="panel"><h2>현재 장부 연결 현황</h2><div class="table-wrap"><table style="font-size:12px"><thead><tr><th>장부 번호</th><th>업체명</th><th>회원아이디</th><th>기준 아이디</th></tr></thead><tbody>{% for membership in memberships %}<tr><td>{{ membership.company_id }}</td><td>{{ membership.company.name|default:'업체명 미등록' }}</td><td>{{ membership.user.username }}</td><td>{{ membership.company.anchor.username }}</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

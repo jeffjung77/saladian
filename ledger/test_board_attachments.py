@@ -27,21 +27,25 @@ class BoardAttachmentTests(AuthenticatedLedgerTestCase):
         self.assertEqual(Client().get(url).status_code, 302)
         response = self.client.get(url)
         self.assertIn('attachment', response['Content-Disposition'])
-        response.close()
+        if response.streaming:
+            b''.join(response.streaming_content)
         response = self.client.get(url, {'preview': 1})
         self.assertEqual(response['Content-Type'], 'image/png')
         self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
-        response.close()
+        if response.streaming:
+            b''.join(response.streaming_content)
         other = get_user_model().objects.create_user(username='attachment-reader')
         self.client.force_login(other)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
-        response.close()
+        if response.streaming:
+            b''.join(response.streaming_content)
         other.is_superuser = True
         other.save()
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        response.close()
+        if response.streaming:
+            b''.join(response.streaming_content)
         other.is_superuser = False
         other.save()
         self.assertEqual(self.client.post(reverse('board_edit', args=[post.pk]), {'title': 'x', 'body': 'x', 'remove_attachment': [image.pk]}).status_code, 403)

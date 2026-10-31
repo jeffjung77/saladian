@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids
 """HTTP 작업 이력. 비밀번호, POST 본문, 검색어, 첨부 내용은 기록하지 않는다."""
 import logging
 from django.db import DatabaseError
@@ -9,6 +10,7 @@ ACTIONS = [('view', '조회'), ('create', '등록'), ('update', '수정'), ('del
            ('login', '로그인'), ('logout', '로그아웃')]
 RESULTS = [('success', '성공'), ('invalid', '입력 오류'), ('denied', '권한 없음'), ('error', '오류')]
 RESOURCES = {
+    'company_members': '업체 장부 공유 관리',
     'deployment_management': '배포 예약 관리',
     'credit_list': '사용자별 크레딧 현황', 'credit_edit': '사용자 크레딧 변경',
     'year_end': '차기이월',
@@ -102,7 +104,7 @@ class AuditMiddleware:
                 else:
                     owner = get_user_model().objects.filter(pk=pk).first() or user
             elif name in ('voucher_edit', 'voucher_delete'):
-                item = Voucher.objects.filter(pk=pk, owner=user).first()
+                item = Voucher.objects.filter(pk=pk, owner_id__in=member_ids(user)).first()
                 owner = item.owner if item else user
         request._audit_owner = owner
         request._audit_company = company_name(owner)

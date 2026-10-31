@@ -217,6 +217,8 @@ def member_registration(request):
             profile = form.save(commit=False)
             profile.user = request.user
             profile.save()
+            from .ledger_scope import ensure_membership
+            ensure_membership(request.user)
             request._audit_target = str(profile.pk)
         messages.success(request, '사용등록 정보를 저장했습니다.')
         return redirect('member_registration')
@@ -247,6 +249,8 @@ def subscription_edit(request, pk):
     form = MemberProfileForm(request.POST if request.method == 'POST' else None, instance=subscription)
     if request.method == 'POST' and form.is_valid():
         form.save()
+        from .ledger_scope import ensure_membership
+        ensure_membership(subscription.user)
         messages.success(request, '구독 등록정보를 수정했습니다.')
         return redirect('subscription_list')
     return render(request, 'ledger/subscription_edit.html', {'form': form, 'subscription': subscription})

@@ -39,11 +39,11 @@ class ReceiptTests(AuthenticatedLedgerTestCase):
         self.assertContains(self.client.get(reverse('receipt_history')), 'receipt.jpg')
         self.assertNotContains(self.client.get(reverse('receipt_history'), {'status': 'completed'}), 'receipt.jpg')
         response = self.client.get(reverse('receipt_photo', args=[item.pk]))
-        self.addCleanup(response.close)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'image/jpeg')
         self.assertIn('no-store', response['Cache-Control'])
-        response.close()
+        if response.streaming:
+            b''.join(response.streaming_content)
 
     def test_photos_and_history_are_owner_only(self):
         self.client.post(reverse('receipt_home'), {'photo': self.photo()})

@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids, anchor_user
 from .account_fields import AccountEntryField
 from django import forms
 from decimal import Decimal
@@ -77,7 +78,7 @@ class VatFormMixin:
 class CounterpartyForm(forms.ModelForm):
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
-        self.instance.owner = user
+        self.instance.owner = self.instance.owner if self.instance.pk else user
         for name in ('name', 'business_number', 'representative', 'address'):
             self.fields[name].required = True
 
@@ -94,7 +95,7 @@ class CounterpartyForm(forms.ModelForm):
 
     def clean_name(self):
         name = self.cleaned_data['name']
-        if Counterparty.objects.filter(owner=self.instance.owner, name=name).exclude(pk=self.instance.pk).exists():
+        if Counterparty.objects.filter(owner_id__in=member_ids(self.instance.owner), name=name).exclude(pk=self.instance.pk).exists():
             raise forms.ValidationError('이미 등록된 거래처명입니다.')
         return name
 
@@ -117,7 +118,7 @@ class CounterpartySelectionMixin:
     def __init__(self, *args, user=None, **kwargs):
         self.user = user
         super().__init__(*args, **kwargs)
-        self.fields['counterparty'].queryset = Counterparty.objects.filter(owner=user) if user is not None and user.is_authenticated else Counterparty.objects.none()
+        self.fields['counterparty'].queryset = Counterparty.objects.filter(owner_id__in=member_ids(user)) if user is not None and user.is_authenticated else Counterparty.objects.none()
         self.fields['counterparty'].empty_label = '거래처 미지정'
 
     def save(self, commit=True):
@@ -362,7 +363,7 @@ class PartnerLedgerForm(PeriodForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        vouchers = Voucher.objects.filter(owner=user) if user is not None and user.is_authenticated else Voucher.objects.none()
-        masters = Counterparty.objects.filter(owner=user) if user is not None and user.is_authenticated else Counterparty.objects.none()
+        vouchers = Voucher.objects.filter(owner_id__in=member_ids(user)) if user is not None and user.is_authenticated else Voucher.objects.none()
+        masters = Counterparty.objects.filter(owner_id__in=member_ids(user)) if user is not None and user.is_authenticated else Counterparty.objects.none()
         names = vouchers.filter(counterparty__isnull=True).exclude(partner='').order_by('partner').values_list('partner', flat=True).distinct()
         self.fields['partner'].choices = [('', '거래처를 선택하세요'), ('unassigned:', '거래처 미입력')] + [(f'master:{partner.pk}', partner.name) for partner in masters] + [('name:' + name, name + ' (기존 입력)') for name in names]

@@ -58,7 +58,8 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 IDLE_TIMEOUT_SECONDS = 30 * 60
-DEPLOYMENT_SCHEDULER_ENABLED = os.environ.get('BPMS_DEPLOYMENT_SCHEDULER') == '1'
+DEPLOYMENT_SIMULATION_MODE = os.name == 'nt' and os.environ.get('DJANGO_SETTINGS_MODULE', 'config.settings') == 'config.settings'
+DEPLOYMENT_SCHEDULER_ENABLED = os.environ.get('BPMS_DEPLOYMENT_SCHEDULER', '1' if DEPLOYMENT_SIMULATION_MODE else '0') == '1'
 
 TEMPLATES = [
     {

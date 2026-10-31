@@ -11,7 +11,7 @@
   banner.hidden = !state.active;
   clearTimeout(cutoffTimer);
   if (!state.active) {if (dialog.open) dialog.close(); return;}
-  const message = state.label + ' 배포 예정입니다. 00:00에 자동 로그아웃됩니다. ' + state.message;
+  const message = (state.simulation ? '[개발 모의 실행] ' : '') + state.label + ' 배포 예정입니다. 00:00에 자동 로그아웃됩니다. ' + state.message;
   banner.textContent = message;
   document.getElementById('deployment-notice-text').textContent = message;
   let seen = false;

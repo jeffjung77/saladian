@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids
 from .voucher_quota import limits_for, save_voucher, VoucherQuotaExceeded
 from django.db import transaction
 from django.db.models import F
@@ -23,7 +24,7 @@ def remaining_creations(user):
 
 @transaction.atomic
 def create_receipt_voucher(item, user, form):
-    claimed = ReceiptPhoto.objects.filter(pk=item.pk, owner=user, status='review', voucher__isnull=True,
+    claimed = ReceiptPhoto.objects.filter(pk=item.pk, owner_id__in=member_ids(user), status='review', voucher__isnull=True,
         ocr_text=item.ocr_text).update(status='completed')
     if not claimed:
         return None

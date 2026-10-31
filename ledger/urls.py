@@ -13,8 +13,12 @@ from . import credits
 from . import expense_views
 from . import counterparty_import
 from . import deployment, deployment_views
+from . import online_users
+from . import company_members
 
 urlpatterns = [
+    path('system/company-members/', company_members.company_members, name='company_members'),
+    path('system/online-users/', online_users.online_users, name='online_users'),
     path('deployment/status/', deployment.status, name='deployment_status'),
     path('maintenance/', deployment.maintenance, name='deployment_maintenance'),
     path('system/deployments/', deployment_views.deployment_management, name='deployment_management'),

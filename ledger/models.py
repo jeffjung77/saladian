@@ -10,6 +10,18 @@ def receipt_photo_path(instance, filename):
     return f'receipts/{instance.owner_id}/{uuid4().hex}'
 
 
+class CompanyLedger(models.Model):
+    name = models.CharField('업체명', max_length=150, blank=True)
+    anchor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class LedgerMembership(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='ledger_membership')
+    company = models.ForeignKey(CompanyLedger, on_delete=models.PROTECT, related_name='memberships')
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+
 class ReceiptPhoto(models.Model):
     class Status(models.TextChoices):
         PROCESSING = 'processing', '인식 중'
@@ -373,6 +385,7 @@ class DeploymentSchedule(models.Model):
         READY = 'ready', '예약 확정'
         RUNNING = 'running', '배포 중'
         SUCCEEDED = 'succeeded', '배포 완료'
+        SIMULATED = 'simulated', '개발 모의 실행 완료'
         FAILED = 'failed', '사전 검사 실패 / 미실행'
         CANCELLED = 'cancelled', '취소'
         ROLLED_BACK = 'rolled_back', '실패 후 이전 버전 복구 완료'

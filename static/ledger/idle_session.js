@@ -32,7 +32,16 @@
   ['pointerdown','keydown','input','scroll','touchstart','mousemove'].forEach(name =>
     document.addEventListener(name, active, {passive:true}));
   window.addEventListener('storage', event => {if (event.key === key) check();});
-  window.addEventListener('pageshow', check);
+  function verifySession() {
+    if (!check()) return;
+    fetch(config.activity, {method:'POST', credentials:'same-origin', headers:{'X-CSRFToken':config.csrf}})
+      .then(response => {if (response.status === 401 || response.redirected) {
+        closing = true;
+        location.replace(config.login);
+      }})
+      .catch(() => {});
+  }
+  window.addEventListener('pageshow', verifySession);
   document.addEventListener('visibilitychange', check);
   setInterval(check, 1000);
 })();

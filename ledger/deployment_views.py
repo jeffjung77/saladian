@@ -71,4 +71,5 @@ def deployment_management(request):
     per_page = 5 if request.GET.get('per_page') == '5' else 10
     page = Paginator(DeploymentSchedule.objects.all(), per_page).get_page(request.GET.get('page'))
     return render(request, 'ledger/deployment_management.html', {'form': form, 'page': page, 'per_page': per_page,
-        'scheduler_enabled': settings.DEPLOYMENT_SCHEDULER_ENABLED})
+        'scheduler_enabled': settings.DEPLOYMENT_SCHEDULER_ENABLED,
+        'simulation_mode': getattr(settings, 'DEPLOYMENT_SIMULATION_MODE', False)})

@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids, anchor_user
 from collections import defaultdict, deque
 from datetime import timedelta, date
 from decimal import Decimal
@@ -99,13 +100,13 @@ def paired_chunks(entries):
 @transaction.atomic
 def save_opening(owner, start_date, revision, entries, actor):
     # Serialize first-time submissions on server databases; the unique owner also prevents duplicates.
-    get_user_model().objects.select_for_update().get(pk=owner.pk)
-    previous = OpeningBalanceBatch.objects.select_for_update().filter(owner=owner).first()
+    get_user_model().objects.select_for_update().get(pk=anchor_user(owner).pk)
+    previous = OpeningBalanceBatch.objects.select_for_update().filter(owner_id__in=member_ids(owner)).first()
     if revision != (previous.revision if previous else 0):
         raise forms.ValidationError('다른 작업에서 기초잔액을 변경했습니다. 화면을 새로고침한 뒤 다시 입력하세요.')
-    if Voucher.objects.filter(owner=owner, opening_batch__isnull=True, date__lt=start_date).exists():
+    if Voucher.objects.filter(owner_id__in=member_ids(owner), opening_batch__isnull=True, date__lt=start_date).exists():
         raise forms.ValidationError('사용 시작일 이전에 일반 전표가 있습니다. 잔액의 이중 합산을 막기 위해 시작일과 기존 전표를 먼저 확인하세요.')
-    batch = previous or OpeningBalanceBatch(owner=owner)
+    batch = previous or OpeningBalanceBatch(owner=anchor_user(owner))
     batch.start_date = start_date
     batch.updated_by = actor
     batch.revision = revision + 1
@@ -127,7 +128,7 @@ def save_opening(owner, start_date, revision, entries, actor):
 def opening_balances(request):
     owner_id = request.POST.get('owner') if request.method == 'POST' else request.GET.get('owner', str(request.user.pk))
     owner = get_user_model().objects.filter(pk=owner_id).first() if str(owner_id).isascii() and str(owner_id).isdigit() and len(str(owner_id)) <= 18 else None
-    batch = OpeningBalanceBatch.objects.filter(owner=owner).first() if owner else None
+    batch = OpeningBalanceBatch.objects.filter(owner_id__in=member_ids(owner)).first() if owner else None
     initial = {'owner': owner, 'start_date': batch.start_date if batch else timezone.localdate(), 'revision': batch.revision if batch else 0}
     form = HeaderForm(request.POST if request.method == 'POST' else None, initial=initial)
     balances = defaultdict(lambda: Decimal(0))

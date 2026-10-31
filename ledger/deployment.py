@@ -42,6 +42,7 @@ def public_state(now=None):
     return {'active': now >= warn, 'blocked': blocked, 'id': job.pk,
         'at': deploy.isoformat(), 'cutoff': cutoff.isoformat(),
         'label': deploy.strftime('%Y년 %m월 %d일 00:01 (한국시간)'),
+        'simulation': getattr(settings, 'DEPLOYMENT_SIMULATION_MODE', False),
         'message': job.message or '서비스 업데이트가 예정되어 있습니다. 입력 중인 자료를 미리 저장해 주세요.'}
 
 

@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids, anchor_user
 from .account_fields import AccountEntryField
 """Conservative OCR suggestions. Missing or ambiguous values require manual review."""
 import re
@@ -86,7 +87,7 @@ def draft_initial(item, user):
     data.setdefault('date', None)
     data.setdefault('vat_amount', None)
     if data.get('merchant'):
-        candidates = list(Counterparty.objects.filter(owner=user, name=data['merchant'])[:2])
+        candidates = list(Counterparty.objects.filter(owner_id__in=member_ids(user), name=data['merchant'])[:2])
         if len(candidates) == 1:
             data['counterparty'] = candidates[0].pk
         data['memo'] = data['merchant']

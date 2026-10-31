@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids, anchor_user
 from .voucher_quota import save_voucher, VoucherQuotaExceeded
 from .models import JournalRowVAT
 from .vat import VAT_FIELDS
@@ -44,7 +45,7 @@ def business_overview(request):
         })
         response['Cache-Control'] = 'private, no-store'
         return response
-    source = Voucher.objects.filter(owner=request.user)
+    source = Voucher.objects.filter(owner_id__in=member_ids(request.user))
     balance = reports.balance_sheet(today, vouchers=source)
     income = reports.income_statement(start, today, vouchers=source)
     accounts = {account.pk: account for account in Account.objects.all()}
@@ -86,7 +87,7 @@ def business_overview(request):
 
 @require_http_methods(['GET'])
 def counterparty_options(request):
-    options = list(Counterparty.objects.filter(owner=request.user).values('id', 'name'))
+    options = list(Counterparty.objects.filter(owner_id__in=member_ids(request.user)).values('id', 'name'))
     response = JsonResponse({'counterparties': options})
     response['Cache-Control'] = 'private, no-store'
     return response
@@ -95,11 +96,11 @@ def counterparty_options(request):
 @management_required
 def counterparties(request):
     query = request.GET.get('q', '').strip()[:100]
-    partners = Counterparty.objects.filter(owner=request.user)
+    partners = Counterparty.objects.filter(owner_id__in=member_ids(request.user))
     if query:
         partners = partners.filter(Q(name__icontains=query) | Q(business_number__icontains=query) | Q(contact_name__icontains=query) | Q(phone__icontains=query))
     if query.upper().startswith('CP') and query[2:].isascii() and query[2:].isdigit() and len(query[2:]) <= 18:
-        partners = Counterparty.objects.filter(owner=request.user, pk=int(query[2:]))
+        partners = Counterparty.objects.filter(owner_id__in=member_ids(request.user), pk=int(query[2:]))
     per_page = 5 if request.GET.get('per_page') == '5' else 10
     page = Paginator(partners, per_page).get_page(request.GET.get('page'))
     return render(request, 'ledger/counterparties.html', {
@@ -110,7 +111,7 @@ def counterparties(request):
 @require_http_methods(['GET', 'POST'])
 @management_required
 def counterparty_edit(request, pk=None):
-    partner = get_object_or_404(Counterparty, pk=pk, owner=request.user) if pk else None
+    partner = get_object_or_404(Counterparty, pk=pk, owner_id__in=member_ids(request.user)) if pk else None
     form = CounterpartyForm(request.POST if request.method == 'POST' else None, request.FILES if request.method == 'POST' else None, instance=partner, user=request.user)
     if request.method == 'POST' and form.is_valid():
         try:
@@ -118,7 +119,7 @@ def counterparty_edit(request, pk=None):
                 form.save()
                 request._audit_target = str(form.instance.pk)
         except IntegrityError:
-            if not Counterparty.objects.filter(owner=request.user, name=form.cleaned_data['name']).exists():
+            if not Counterparty.objects.filter(owner_id__in=member_ids(request.user), name=form.cleaned_data['name']).exists():
                 raise
             form.add_error('name', '이미 등록된 거래처명입니다.')
         else:
@@ -132,34 +133,34 @@ def account_ledger(request):
     form = AccountLedgerForm(request.GET if any(key != 'export' for key in request.GET) else None, initial={'start': today.replace(month=1, day=1), 'end': today}, user=request.user)
     report = None
     if form.is_bound and form.is_valid():
-        report = reports.account_ledger(form.cleaned_data['account'], form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner=request.user))
+        report = reports.account_ledger(form.cleaned_data['account'], form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner_id__in=member_ids(request.user)))
     return report_render(request, 'ledger/account_ledger.html', {'form': form, 'report': report})
 
 
 def trial_balance(request):
     today = timezone.localdate()
     form = BalanceSheetForm(request.GET if any(key != 'export' for key in request.GET) else {'as_of': today})
-    report = reports.trial_balance(form.cleaned_data['as_of'], vouchers=Voucher.objects.filter(owner=request.user)) if form.is_valid() else None
+    report = reports.trial_balance(form.cleaned_data['as_of'], vouchers=Voucher.objects.filter(owner_id__in=member_ids(request.user))) if form.is_valid() else None
     return report_render(request, 'ledger/trial_balance.html', {'form': form, 'report': report})
 
 
 def balance_sheet(request):
     today = timezone.localdate()
     form = BalanceSheetForm(request.GET if any(key != 'export' for key in request.GET) else {'as_of': today})
-    report = reports.balance_sheet(form.cleaned_data['as_of'], vouchers=Voucher.objects.filter(owner=request.user)) if form.is_valid() else None
+    report = reports.balance_sheet(form.cleaned_data['as_of'], vouchers=Voucher.objects.filter(owner_id__in=member_ids(request.user))) if form.is_valid() else None
     return report_render(request, 'ledger/balance_sheet.html', {'form': form, 'report': report})
 
 
 def income_statement(request):
     today = timezone.localdate()
     form = IncomeStatementForm(request.GET if any(key != 'export' for key in request.GET) else {'start': today.replace(month=1, day=1), 'end': today})
-    report = reports.income_statement(form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner=request.user)) if form.is_valid() else None
+    report = reports.income_statement(form.cleaned_data['start'], form.cleaned_data['end'], vouchers=Voucher.objects.filter(owner_id__in=member_ids(request.user))) if form.is_valid() else None
     return report_render(request, 'ledger/income_statement.html', {'form': form, 'report': report})
 
 
 @management_required
 def accounts(request):
-    disabled = set(AccountPreference.objects.filter(owner=request.user, is_active=False).values_list('account_id', flat=True))
+    disabled = set(AccountPreference.objects.filter(owner_id__in=member_ids(request.user), is_active=False).values_list('account_id', flat=True))
     rows = list(visible_accounts(request.user))
     for account in rows:
         account.is_active = account.pk not in disabled
@@ -173,7 +174,9 @@ def account_status(request, code):
     state = request.POST.get('is_active')
     if state not in ('0', '1'):
         return JsonResponse({'error': '사용 여부를 선택하세요.'}, status=400)
-    AccountPreference.objects.update_or_create(owner=request.user, account=account, defaults={'is_active': state == '1'})
+    with transaction.atomic():
+        AccountPreference.objects.filter(owner_id__in=member_ids(request.user), account=account).delete()
+        AccountPreference.objects.create(owner=anchor_user(request.user), account=account, is_active=state == '1')
     messages.success(request, f'{account} 계정을 {"사용" if state == "1" else "비사용"}으로 설정했습니다.')
     return redirect('accounts')
 
@@ -207,9 +210,9 @@ def partner_ledger(request):
     journal_vouchers = Voucher.objects.none()
     if form.is_valid():
         selected = form.cleaned_data['partner']
-        vouchers = Voucher.objects.select_related('account_master', 'counterparty').filter(owner=request.user)
+        vouchers = Voucher.objects.select_related('account_master', 'counterparty').filter(owner_id__in=member_ids(request.user))
         if selected.startswith('master:'):
-            partner = get_object_or_404(Counterparty, pk=selected[len('master:'):], owner=request.user)
+            partner = get_object_or_404(Counterparty, pk=selected[len('master:'):], owner_id__in=member_ids(request.user))
             partner_name = partner.name
             vouchers = vouchers.filter(counterparty=partner)
         else:
@@ -249,7 +252,7 @@ def voucher_entry(request):
 
 def dashboard(request):
     period = PeriodForm(request.GET)
-    vouchers = Voucher.objects.select_related('account_master', 'counterparty').filter(owner=request.user)
+    vouchers = Voucher.objects.select_related('account_master', 'counterparty').filter(owner_id__in=member_ids(request.user))
     if period.is_valid():
         if period.cleaned_data.get('start'):
             vouchers = vouchers.filter(date__gte=period.cleaned_data['start'])
@@ -272,7 +275,7 @@ def dashboard(request):
 @require_http_methods(['GET', 'POST'])
 @prevent_duplicate_submission
 def edit(request, pk=None, entry_type=Voucher.EntryType.OTHER):
-    voucher = get_object_or_404(Voucher, pk=pk, owner=request.user) if pk else None
+    voucher = get_object_or_404(Voucher, pk=pk, owner_id__in=member_ids(request.user)) if pk else None
     if voucher and voucher.closing_batch_id:
         return render(request, 'ledger/year_end_locked.html', status=403)
     if voucher and voucher.opening_batch_id:
@@ -284,7 +287,7 @@ def edit(request, pk=None, entry_type=Voucher.EntryType.OTHER):
     form = VoucherForm(request.POST if request.method == 'POST' else None, instance=voucher, entry_type=entry_type, user=request.user)
     if request.method == 'POST' and form.is_valid():
         saved = form.save(commit=False)
-        saved.owner = request.user
+        saved.owner = voucher.owner if voucher else request.user
         if not voucher:
             saved.submission_token = form.cleaned_data.get('submission_token')
         try:
@@ -322,7 +325,7 @@ def journal_edit(request, voucher=None):
             try:
                 with transaction.atomic():
                     saved = form.save(commit=False)
-                    saved.owner = request.user
+                    saved.owner = voucher.owner if voucher else request.user
                     if not voucher:
                         saved.submission_token = form.cleaned_data.get('submission_token')
                     saved.entry_type = Voucher.EntryType.OTHER
@@ -365,7 +368,7 @@ def journal_edit(request, voucher=None):
 
 @require_http_methods(['GET', 'POST'])
 def delete(request, pk):
-    voucher = get_object_or_404(Voucher, pk=pk, owner=request.user)
+    voucher = get_object_or_404(Voucher, pk=pk, owner_id__in=member_ids(request.user))
     if voucher.closing_batch_id:
         return render(request, 'ledger/year_end_locked.html', status=403)
     if voucher.opening_batch_id:
@@ -380,7 +383,7 @@ def delete(request, pk):
 @require_http_methods(['GET'])
 @management_required
 def counterparty_certificate(request, pk):
-    partner = get_object_or_404(Counterparty, pk=pk, owner=request.user)
+    partner = get_object_or_404(Counterparty, pk=pk, owner_id__in=member_ids(request.user))
     if not partner.business_certificate:
         raise Http404
     try:

@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids, anchor_user
 from .pagination import page_size
 from decimal import Decimal
 from django.contrib.auth import get_user_model
@@ -29,6 +30,9 @@ def company_list(request):
         companies = companies.filter(Q(username__icontains=query) | Q(subscription__company_name__icontains=query) |
             Q(subscription__business_number__icontains=query) | Q(business_profile__company_name__icontains=query))
     page = Paginator(companies, page_size(request)).get_page(request.GET.get('page'))
+    for member in page:
+        member.voucher_count = Voucher.objects.filter(owner_id__in=member_ids(member)).count()
+        member.partner_count = Counterparty.objects.filter(owner_id__in=member_ids(member)).count()
     return render(request, 'ledger/company_list.html', {'page': page, 'q': query})
 
 
@@ -42,11 +46,11 @@ def company_detail(request, company_id):
     if tab not in dict(TABS):
         tab = 'summary'
     today = timezone.localdate()
-    source = Voucher.objects.filter(owner=owner)
+    source = Voucher.objects.filter(owner_id__in=member_ids(owner))
     period = IncomeStatementForm({'start': request.GET.get('start', today.replace(day=1)), 'end': request.GET.get('end', today)})
     as_of = BalanceSheetForm({'as_of': request.GET.get('as_of', today)})
     context = {'owner': owner, 'tab': tab, 'tabs': TABS, 'period': period, 'as_of': as_of,
-        'voucher_count': source.count(), 'partner_count': Counterparty.objects.filter(owner=owner).count()}
+        'voucher_count': source.count(), 'partner_count': Counterparty.objects.filter(owner_id__in=member_ids(owner)).count()}
     if tab in ('summary', 'income') and period.is_valid():
         context['income'] = reports.income_statement(period.cleaned_data['start'], period.cleaned_data['end'], vouchers=source)
     if tab in ('summary', 'balance') and as_of.is_valid():
@@ -56,25 +60,25 @@ def company_detail(request, company_id):
     if tab == 'vouchers':
         context['page'] = Paginator(source.select_related('account_master', 'settlement_account', 'counterparty').prefetch_related('journal_lines__account'), 25).get_page(request.GET.get('page'))
     elif tab == 'partners':
-        context['page'] = Paginator(Counterparty.objects.filter(owner=owner), 25).get_page(request.GET.get('page'))
+        context['page'] = Paginator(Counterparty.objects.filter(owner_id__in=member_ids(owner)), 25).get_page(request.GET.get('page'))
     elif tab == 'accounts':
-        disabled = set(AccountPreference.objects.filter(owner=owner, is_active=False).values_list('account_id', flat=True))
+        disabled = set(AccountPreference.objects.filter(owner_id__in=member_ids(owner), is_active=False).values_list('account_id', flat=True))
         accounts = list(visible_accounts(owner))
         for account in accounts:
             account.is_active = account.pk not in disabled
         context['accounts'] = accounts
     elif tab == 'logs':
-        context['page'] = Paginator(AuditLog.objects.filter(company_user=owner), 50).get_page(request.GET.get('page'))
+        context['page'] = Paginator(AuditLog.objects.filter(company_user_id__in=member_ids(owner)), 50).get_page(request.GET.get('page'))
     elif tab == 'account_ledger':
         form = AccountLedgerForm({'account': request.GET.get('account', ''), 'start': request.GET.get('start', today.replace(day=1)), 'end': request.GET.get('end', today)}, user=owner)
         context['ledger_form'] = form
         if request.GET.get('account') and form.is_valid():
             context['ledger'] = reports.account_ledger(form.cleaned_data['account'], form.cleaned_data['start'], form.cleaned_data['end'], vouchers=source)
     elif tab == 'partner_ledger':
-        context['partners'] = Counterparty.objects.filter(owner=owner)
+        context['partners'] = Counterparty.objects.filter(owner_id__in=member_ids(owner))
         selected = request.GET.get('partner')
         if selected:
-            partner = get_object_or_404(Counterparty, pk=selected if selected.isascii() and selected.isdigit() and len(selected) <= 18 else 0, owner=owner)
+            partner = get_object_or_404(Counterparty, pk=selected if selected.isascii() and selected.isdigit() and len(selected) <= 18 else 0, owner_id__in=member_ids(owner))
             context['selected_partner'] = partner
             if period.is_valid():
                 vouchers = source.filter(counterparty=partner, date__gte=period.cleaned_data['start'], date__lte=period.cleaned_data['end'])

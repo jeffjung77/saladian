@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids
 from django.db.models import Q
 from .models import Account, AccountPreference
 
@@ -5,14 +6,14 @@ from .models import Account, AccountPreference
 def visible_accounts(user):
     if user is None or not user.is_authenticated:
         return Account.objects.filter(owner__isnull=True)
-    return Account.objects.filter(Q(owner__isnull=True) | Q(owner=user))
+    return Account.objects.filter(Q(owner__isnull=True) | Q(owner_id__in=member_ids(user)))
 
 
 def selectable_accounts(user, existing=()):
     accounts = visible_accounts(user)
     if user is None or not user.is_authenticated:
         return accounts
-    disabled = AccountPreference.objects.filter(owner=user, is_active=False).values('account_id')
+    disabled = AccountPreference.objects.filter(owner_id__in=member_ids(user), is_active=False).values('account_id')
     return accounts.filter(~Q(pk__in=disabled) | Q(pk__in=[code for code in existing if code]))
 
 

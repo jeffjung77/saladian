@@ -24,7 +24,12 @@ class IdleSessionMiddleware:
                 return redirect_to_login(request.get_full_path())
             request.session['last_activity_at'] = now
             request.session.set_expiry(settings.IDLE_TIMEOUT_SECONDS)
-        return self.get_response(request)
+        response = self.get_response(request)
+        # Login authenticates inside the view, after the request-side check.
+        if request.user.is_authenticated and 'last_activity_at' not in request.session:
+            request.session['last_activity_at'] = time.time()
+            request.session.set_expiry(settings.IDLE_TIMEOUT_SECONDS)
+        return response
 
 
 @login_required

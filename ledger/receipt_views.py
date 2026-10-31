@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids
 from .voucher_quota import limits_for, VoucherQuotaExceeded
 import warnings
 from datetime import timedelta
@@ -97,7 +98,7 @@ def receipt_home(request):
 @require_GET
 def receipt_history(request):
     status = request.GET.get('status', '')
-    items = ReceiptPhoto.objects.filter(owner=request.user)
+    items = ReceiptPhoto.objects.filter(owner_id__in=member_ids(request.user))
     if status in ReceiptPhoto.Status.values:
         items = items.filter(status=status)
     else:
@@ -113,7 +114,7 @@ def receipt_history(request):
 @login_required
 @require_GET
 def receipt_photo(request, pk):
-    item = get_object_or_404(ReceiptPhoto, pk=pk, owner=request.user)
+    item = get_object_or_404(ReceiptPhoto, pk=pk, owner_id__in=member_ids(request.user))
     try:
         response = FileResponse(item.photo.open('rb'), content_type=item.image_type)
     except FileNotFoundError:
@@ -127,7 +128,7 @@ def receipt_photo(request, pk):
 @login_required
 @require_GET
 def receipt_detail(request, pk):
-    item = get_object_or_404(ReceiptPhoto, pk=pk, owner=request.user)
+    item = get_object_or_404(ReceiptPhoto, pk=pk, owner_id__in=member_ids(request.user))
     return render(request, 'ledger/receipt_detail.html', {'item': item})
 
 
@@ -135,10 +136,10 @@ def receipt_detail(request, pk):
 @login_required
 @require_http_methods(['POST'])
 def receipt_analyze(request, pk):
-    item = get_object_or_404(ReceiptPhoto, pk=pk, owner=request.user)
+    item = get_object_or_404(ReceiptPhoto, pk=pk, owner_id__in=member_ids(request.user))
     started = timezone.now()
     # Claim atomically; repeated clicks must not issue concurrent paid requests.
-    eligible = ReceiptPhoto.objects.filter(pk=item.pk, owner=request.user).exclude(status=ReceiptPhoto.Status.COMPLETED)
+    eligible = ReceiptPhoto.objects.filter(pk=item.pk, owner_id__in=member_ids(request.user)).exclude(status=ReceiptPhoto.Status.COMPLETED)
     eligible = eligible.filter(~Q(status=ReceiptPhoto.Status.PROCESSING) | Q(ocr_started_at__lt=started-timedelta(minutes=2)))
     if not eligible.update(status=ReceiptPhoto.Status.PROCESSING, ocr_started_at=started, ocr_error=''):
         messages.info(request, '이미 분석 중이거나 전표 생성이 완료된 영수증입니다.')
@@ -185,7 +186,7 @@ def receipt_analyze(request, pk):
 @login_required
 @require_http_methods(['GET', 'POST'])
 def receipt_expense(request, pk):
-    item = get_object_or_404(ReceiptPhoto, pk=pk, owner=request.user)
+    item = get_object_or_404(ReceiptPhoto, pk=pk, owner_id__in=member_ids(request.user))
     if item.status == ReceiptPhoto.Status.COMPLETED:
         messages.info(request, '이미 비용전표가 생성된 영수증입니다.')
         return redirect('receipt_detail', pk=pk)

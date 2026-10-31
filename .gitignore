@@ -20,3 +20,8 @@ dist/
 desktop/build-data/
 *.spec
 ~$*
+
+migration_backup/
+logs/
+*.pid
+.postgres-init-password

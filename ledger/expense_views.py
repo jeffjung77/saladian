@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids, anchor_user
 from calendar import monthrange
 from django import forms
 from django.contrib.auth import get_user_model
@@ -22,7 +23,7 @@ class ExpenseFilter(forms.Form):
 def monthly_expenses(owner, month, end=None):
     start = month.replace(day=1)
     end = end or month.replace(day=monthrange(month.year, month.month)[1])
-    accounts, balances, excluded, _ = collect_balances(Voucher.objects.filter(owner=owner, date__gte=start, date__lte=end, is_closing=False))
+    accounts, balances, excluded, _ = collect_balances(Voucher.objects.filter(owner_id__in=member_ids(owner), date__gte=start, date__lte=end, is_closing=False))
     rows = [{'name': a.name, 'code': a.code, 'amount': balances.get(a.pk, 0)} for a in accounts.values()
             if a.category in ('매출원가', '판매비와관리비', '영업외비용', '법인세비용') and balances.get(a.pk, 0) > 0]
     rows.sort(key=lambda r: (-r['amount'], r['code']))
@@ -48,7 +49,7 @@ def expense_status(request):
         if request.method == 'POST':
             ExpenseChartPreference.objects.update_or_create(owner=owner, defaults={'enabled': form.cleaned_data['enabled']})
             return redirect(f"{request.path}?user={owner.pk}&month={form.cleaned_data['month']:%Y-%m}")
-        form = ExpenseFilter(actor=request.user, initial={'user': owner.pk, 'month': form.cleaned_data['month'].strftime('%Y-%m'), 'enabled': ExpenseChartPreference.objects.filter(owner=owner, enabled=True).exists()})
+        form = ExpenseFilter(actor=request.user, initial={'user': owner.pk, 'month': form.cleaned_data['month'].strftime('%Y-%m'), 'enabled': ExpenseChartPreference.objects.filter(owner_id__in=member_ids(owner), enabled=True).exists()})
         context['form'] = form
         context.update(monthly_expenses(owner, month))
     return render(request, 'ledger/expense_status.html', context)

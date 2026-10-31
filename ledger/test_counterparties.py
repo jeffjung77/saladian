@@ -58,7 +58,8 @@ class CounterpartyTests(AuthenticatedLedgerTestCase):
             download = reverse('counterparty_certificate', args=[partner.pk])
             response = self.client.get(download)
             self.assertEqual(b''.join(response.streaming_content), pdf)
-            response.close()
+            if response.streaming:
+                b''.join(response.streaming_content)
             self.assertEqual(Client().get(download).status_code, 302)
             other = get_user_model().objects.create_user(username='download-other', is_staff=True)
             client = Client()

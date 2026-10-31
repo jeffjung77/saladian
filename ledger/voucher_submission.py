@@ -1,3 +1,4 @@
+from .ledger_scope import member_ids, anchor_user
 from functools import wraps
 from uuid import UUID
 from django.contrib import messages
@@ -16,7 +17,7 @@ def prevent_duplicate_submission(view):
             except (ValueError, TypeError, AttributeError):
                 pass
         def existing_response():
-            saved = Voucher.objects.filter(owner=request.user, submission_token=token).first() if token else None
+            saved = Voucher.objects.filter(owner_id__in=member_ids(request.user), submission_token=token).first() if token else None
             if saved:
                 messages.success(request, f'전표가 저장되었습니다. 전표번호는 {saved.pk} 번입니다.', extra_tags=f'voucher-saved-popup voucher-entry-{saved.entry_type}')
                 return redirect('dashboard')
